@@ -27,6 +27,7 @@ WriteMakefile
 
    EXE_FILES    => [
 		    glob('tt*.perl'),
+		    glob('tt*.sh'),
 		   ],
   );
 

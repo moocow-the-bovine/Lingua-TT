@@ -1,7 +1,14 @@
-foo
-bar
-baz
+Foo	FOO	A	B	C
+Bar	BAR	D	E
+Baz	BAZ	F
 
-bonk
-bloop
-blappo
+
+%% a lonely comment
+
+
+
+%% A comment
+bonk	BONK
+BlOoP	BLOOP
+%% another comment
+blAPPo	BLAPPO

@@ -36,12 +36,27 @@ sub isEmpty {
   return !grep {!$_->isEmpty} @{$_[0]};
 }
 
-## $tok = $tok->rmEmptyTokens()
+## $sent = $sent->rmEmptyTokens()
 ##  + removes empty & undefined tokens from @$sent
 sub rmEmptyTokens {
   @{$_[0]} = grep {defined($_) && !$_->isEmpty} @{$_[0]};
   return $_[0];
 }
+
+## $sent = $sent->rmComments()
+##  + removes comment pseudo-tokens from @$sent
+sub rmComments {
+  @{$_[0]} = grep {!defined($_) || !$_->isComment} @{$_[0]};
+  return $_[0];
+}
+
+## $sent = $sent->rmNonVanilla()
+##  + removes non-vanilla tokens from @$sent
+sub rmNonVanilla {
+  @{$_[0]} = grep {defined($_) && $_->isVanilla} @{$_[0]};
+  return $_[0];
+}
+
 
 ##==============================================================================
 ## Methods: I/O

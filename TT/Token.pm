@@ -1,7 +1,7 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Token.pm
 ## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
-## Descript: TT I/O: tokens
+## Descript: TT I/O: tokens (and comments)
 
 
 package Lingua::TT::Token;
@@ -36,12 +36,25 @@ sub isEmpty {
   return !grep {$_ ne ''} @{$_[0]};
 }
 
+## $bool = $tok->isComment()
+##  + true iff $tok is a comment pseudo-token
+sub isComment {
+  return defined($_[0][0]) && $_[0][0] =~ /^\s*\%\%/;
+}
+
+## $bool = $tok->isVanilla()
+##  + true if $tok is a "vanilla" (non-empty and non-comment) token
+sub isVanilla {
+  return !($_[0]->isEmpty || $_[0]->isComment);
+}
+
 ## $tok = $tok->rmEmptyFields()
 ##  + removes empty & undefined fields from @$tok
 sub rmEmptyFields {
   @{$_[0]} = grep {defined($_) && $_ ne ''} @{$_[0]};
   return $_[0];
 }
+
 
 ##==============================================================================
 ## Methods: I/O

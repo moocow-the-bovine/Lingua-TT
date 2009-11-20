@@ -64,10 +64,10 @@ sub open {
     $mode .= '&' if (UNIVERSAL::isa($src,'IO::Handle') && $mode !~ /\&/);
     $io->{fh} = IO::Handle->new() if (!defined($io->{fh}));
     CORE::open($io->{fh},$mode,$src)
-	or confess(ref($io)."::open(): open failed for mode '$mode' from '$io->{name}': $!");
+	or confess(ref($io)."::open(): open failed with mode '$mode' for '$io->{name}': $!");
   } else {
     $io->{fh} = IO::File->new($mode.$src)
-      or confess(ref($io)."::open(): open failed for mode '$mode' from file '$src': $!");
+      or confess(ref($io)."::open(): open failed with mode '$mode' for file '$src': $!");
   }
   return $io;
 }
