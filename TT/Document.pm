@@ -45,6 +45,18 @@ sub rmEmptyTokens {
   return $_[0];
 }
 
+## $nSents = $doc->nSentences()
+sub nSentences {
+  return scalar(@{$_[0]});
+}
+
+## $nToks = $doc->nTokens()
+sub nTokens {
+  my $n = 0;
+  $n += scalar(@$_) foreach (@{$_[0]});
+  return $n;
+}
+
 ##==============================================================================
 ## Methods: I/O
 
@@ -60,6 +72,40 @@ sub fromString {
   #my ($sent,$str) = @_;
   @{$_[0]} = map {Lingua::TT::Sentence->newFromString($_)} split(/(?:\r?\n){2}/,$_[1]);
   return $_[0];
+}
+
+##==============================================================================
+## Methods: Shuffle & Split
+
+## $doc = $doc->shuffle()
+##  + randomly re-orders sentences in @$doc
+##  + sensitive to current random seed (set with srand($seed))
+sub shuffle {
+  my $doc  = shift;
+  my @keys = map {rand} @$doc;
+  @$doc = @$doc[sort {$keys[$a]<=>$keys[$b]} (0..$#$doc)];
+  return $doc;
+}
+
+##  @docs = $doc->splitN($n)  ##-- array context
+## \@docs = $doc->splitN($n)  ##-- scalar context
+##  + splits $doc into $n roughly equally-sized @docs
+##  + sentence data is shared (refs) between $doc and @docs
+sub splitN {
+  my ($doc,$n) = @_;
+  my @odocs  = map {$doc->new} (1..$n);
+  my @osizes = map {0} @odocs;
+  my ($sent,$oi,$oi_min);
+  foreach $sent (@$doc) {
+    ##-- find smallest @odoc
+    $oi_min = 0;
+    foreach $oi (1..$#odocs) {
+      $oi_min = $oi if ($osizes[$oi] < $osizes[$oi_min]);
+    }
+    push(@{$odocs[$oi_min]}, $sent);
+    $osizes[$oi_min] += scalar(@$sent);
+  }
+  return wantarray ? @odocs : \@odocs;
 }
 
 ##==============================================================================

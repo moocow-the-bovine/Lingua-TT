@@ -25,6 +25,7 @@ our $bytoken      = 0;
 
 our $verbose      = 1;
 
+our %ioargs = (encoding=>'UTF-8');
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -45,6 +46,7 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output1|o1=s' => \$outfile1,
 	   'output2|o2=s' => \$outfile2,
+	   'encoding|e=s' => \$ioargs{encoding},
 	  );
 
 pod2usage({
@@ -85,24 +87,21 @@ push(@ARGV, '-') if (!@ARGV);
 ##-- set random seed
 srand($srand) if (defined($srand));
 
-##-- read in data file
-@sents = qw();
-$sent = '';
-$ntoks = 0;
-while (<>) {
-  next if (/^\s*%%/);
-  chomp;
-  if (/^\s*$/) {
-    push(@sents, $sent."\n") if ($sent ne '');
-    $sent = '';
-    next;
-  }
-  ++$ntoks;
-  $sent .= $_ . "\n";
+##-- read in source file
+my ($ttin);
+our $doc = Lingua::TT::Document->new();
+our $ntoks = 0;
+my ($docin);
+foreach $infile (@ARGV) {
+  $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
+    or die("$0: open failed for file '$infile': $!");
+  $docin = $ttin->getDocument;
+  push(@$doc,@$docin)
 }
 
 ##-- stats
-$nsents = scalar(@sents);
+$nsents = $doc->nSentences;
+$ntoks  = $doc->nTokens;
 $nitems = $bytoken ? $ntoks : $nsents;
 $n1     = $frac1 * $nitems if (defined($frac1));
 
@@ -113,25 +112,26 @@ print STDERR
 
 ##-- output: file 1
 $ntoks1 = $nsents1 = 0;
-open(OUT1, ">$outfile1") or die("$0: open failed for '$outfile1': $!");
-while (@sents && $n1 > 0) {
-  $si = int(rand(@sents));
-  $s  = splice(@sents,$si,1);
-  print OUT1 $s;
+our $ttout1 = Lingua::TT::IO->toFile($outfile1,%ioargs)
+  or die("$0: open failed for '$outfile1': $!");
+while (@$doc && $n1 > 0) {
+  $si = int(rand(@$doc));
+  $s  = splice(@$doc,$si,1);
+  $ttout1->putSentence($s);
 
   ##-- count number of tokens in output files
-  @tmp     = ($s=~/\n/mg);
-  $ntoks1 += @tmp;
+  $ntoks1 += @$s;
   $nsents1++;
 
-  $n1 -= $bytoken ? scalar(@tmp) : 1;
+  $n1 -= $bytoken ? scalar(@$s) : 1;
 }
-close(OUT1);
+$ttout1->close;
 
 ##-- print all remaining sentences as-is to $outfile2
-open(OUT2, ">$outfile2") or die("$0: open failed for '$outfile2': $!");
-print OUT2 @sents;
-close(OUT2);
+$ttout2 = Lingua::TT::IO->toFile($outfile2,%ioargs)
+  or die("$0: open failed for '$outfile2': $!");
+$ttout2->putDocument($doc);
+$ttout2->close();
 
 ##-- Summarize
 $ntoks2  = $ntoks - $ntoks1;
@@ -162,11 +162,11 @@ __END__
 
 =head1 NAME
 
-tt-split.perl - split up .t, .tt, and .ttt files
+tt-split2.perl - split up .t, .tt, and .ttt files into two parts
 
 =head1 SYNOPSIS
 
- tt-split.perl OPTIONS [FILE(s)]
+ tt-split2.perl OPTIONS [FILE(s)]
 
  General Options:
    -help
