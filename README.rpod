@@ -1,0 +1,33 @@
+=pod
+
+README for Lingua::TT
+
+=head1 ABSTRACT
+
+Lingua::TT - utilities for TnT-style corpus-, sentence-, and token-I/O
+
+=head1 REQUIREMENTS
+
+=over 4
+
+=item Encode
+
+=item Storable
+
+=item Getopt::Long
+
+=item Pod::Usage
+
+=back
+
+
+=head1 DESCRIPTION
+
+The Lingua::TT package provides some utilities for
+TnT-style corpus-, sentence-, and token-I/O.
+
+=head1 AUTHOR
+
+Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
+
+=cut
