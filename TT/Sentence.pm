@@ -27,6 +27,17 @@ sub newFromString {
   return $_[0]->new()->fromString($_[1]);
 }
 
+## $sent2 = $sent->copy($depth)
+##  + creates a copy of $sent
+##  + if $deep is 0, only a shallow copy is created (tokens are shared)
+##  + if $deep is >=1 (or <0), sentences are copied as well (tokens are copied)
+sub copy {
+  my ($sent,$deep) = @_;
+  my $sent2 = bless([],ref($sent));
+  @$sent2 = $deep ? (map {bless([@$_],ref($_))} @$sent) : @$sent;
+  return $sent2;
+}
+
 ##==============================================================================
 ## Methods: Access
 
@@ -73,6 +84,28 @@ sub fromString {
   #my ($sent,$str) = @_;
   @{$_[0]} = map {Lingua::TT::Token->newFromString($_)} split(/[\r\n]+/,$_[1]);
   return $_[0];
+}
+
+##==============================================================================
+## Methods: Raw Text (heuristic)
+
+## $str = $sent->rawString()
+sub rawString {
+  my $sent = shift;  ##-- ( \@tok1, \@tok2, ..., \@tokN )
+  my @spaces = qw(); ##-- ( $space_before_tok1, ..., $space_before_tokN )
+
+  ##-- insert boundary space
+  @spaces = map {''} @$sent;
+  my ($i,$t1,$t2);
+  foreach $i (1..$#$sent) {
+    ($t1,$t2) = @$sent[($i-1),$i];
+    next if ($t2->[0] =~ /^(?:[\]\)\%\.\,\:\;\!\?])|\'\'$/); ##-- no token-boundary space BEFORE these text types
+    next if ($t1->[0] =~ /^(?:[\[\(])|\`\`$/);               ##-- no token-boundary space AFTER  these text types
+    $spaces[$i] = ' ';                                       ##-- default: add token-boundary space
+  }
+
+  ##-- dump raw text
+  return join('', map {($spaces[$_],$sent->[$_][0])} (0..$#$sent));
 }
 
 ##==============================================================================

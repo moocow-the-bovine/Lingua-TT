@@ -19,7 +19,7 @@ use strict;
 ##==============================================================================
 ## Globals & Constants
 
-##==============================================================================
+#==============================================================================
 ## Constructors etc.
 
 ## $io = CLASS_OR_OBJECT->new(%opts)
@@ -38,6 +38,12 @@ sub new {
 		@_,
 	       }, ref($that)||$that);
 }
+
+#x undef = $io->DESTROY()
+#x  + destructor implicitly calls close()
+#sub DESTROY {
+#  $_[0]->close();
+#}
 
 ##==============================================================================
 ## Methods: I/O: Generic
@@ -183,25 +189,6 @@ sub getDocument {
   return $doc;
 }
 
-sub getDocument1 {
-  my $io = shift;
-  return undef if ($io->eof);
-  my $doc   = bless([],'Lingua::TT::Document');
-  my $sent  = bless([],'Lingua::TT::Sentence');
-  my ($line);
-  while (defined($line=$io->{fh}->getline)) {
-    if ($line =~ /^\r?$/) {
-      push(@$doc, $sent);
-      $sent=bless([],'Lingua::TT::Sentence');
-      next;
-    }
-    #push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
-    push(@$sent, bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$line))], 'Lingua::TT::Token'));
-  }
-  push(@$doc,$sent) if (!$sent->isEmpty);
-  return $doc;
-}
-
 ##==============================================================================
 ## Methods: I/O: Output
 
@@ -220,7 +207,7 @@ sub putSentence {
 ## $io = $io->putDocument($doc)
 ##  + writes $doc to output stream
 sub putDocument {
-  $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString), "\n");
+  $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString)); #, "\n"
 }
 
 

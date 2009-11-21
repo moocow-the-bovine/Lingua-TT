@@ -27,6 +27,13 @@ sub newFromString {
   return bless([split(/[\n\r]*[\t\n\r][\n\r]*/,$_[1])], ref($_[0])||$_[0]);
 }
 
+## $tok2 = $tok->copy($deep)
+##  + creates a (shallow) copy of $tok
+##  + $deep is ignored
+sub copy {
+  return bless([@{$_[0]}], ref($_[0]));
+}
+
 ##==============================================================================
 ## Methods: Access
 

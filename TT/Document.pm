@@ -29,21 +29,20 @@ sub newFromString {
   return $_[0]->new()->fromString($_[1]);
 }
 
+## $doc2 = $doc->copy($depth)
+##  + creates a copy of $doc
+##  + if $deep is 0, only a shallow copy is created (sentences & tokens are shared)
+##  + if $deep is >=1 (or <0), sentences are copied as well (tokens are still shared)
+##  + if $deep is >=2 (or <0), tokens are copied as well
+sub copy {
+  my ($doc,$deep) = @_;
+  my $doc2 = bless([],ref($doc));
+  @$doc2 = $deep ? (map {$_->copy($deep-1)} @$doc) : @$doc;
+  return $doc2;
+}
+
 ##==============================================================================
-## Methods: Access
-
-## $bool = $doc->isEmpty()
-##  + true iff $sent has no non-empty sentences
-sub isEmpty {
-  return !grep {!$_->isEmpty} @{$_[0]};
-}
-
-## $doc = $doc->rmEmptySentences()
-##  + removes empty & undefined sentences from @$doc
-sub rmEmptyTokens {
-  @{$_[0]} = grep {defined($_) && !$_->isEmpty} @{$_[0]};
-  return $_[0];
-}
+## Methods: Access & Manipulation
 
 ## $nSents = $doc->nSentences()
 sub nSentences {
@@ -55,6 +54,60 @@ sub nTokens {
   my $n = 0;
   $n += scalar(@$_) foreach (@{$_[0]});
   return $n;
+}
+
+## $bool = $doc->isEmpty()
+##  + true iff $sent has no non-empty sentences
+sub isEmpty {
+  return !grep {!$_->isEmpty} @{$_[0]};
+}
+
+## $doc = $doc->rmEmptySentences()
+##  + removes empty & undefined sentences from @$doc
+sub rmEmptySentences {
+  @{$_[0]} = grep {defined($_) && !$_->isEmpty} @{$_[0]};
+  return $_[0];
+}
+
+## $doc = $doc->rmEmptyTokens()
+##  + removes all empty tokens from all sentences in @$doc
+sub rmEmptyTokens {
+  $_->rmEmptyTokens foreach (@{$_[0]});
+  return $_[0];
+}
+
+## $doc = $doc->rmComments()
+##  + removes all comment pseudo-tokens from all sentences in @$doc
+sub rmComments {
+  $_->rmComments foreach (@{$_[0]});
+  return $_[0];
+}
+
+## $doc = $doc->rmNonVanilla()
+##  + removes non-vanilla tokens from all sentences in @$doc
+sub rmNonVanilla {
+  $_->rmNonVanilla foreach (@{$_[0]});
+  return $_[0];
+}
+
+## $doc = $doc->canonicalize()
+##  + removes all non-vanilla tokens and empty setences from @$doc
+sub canonicalize {
+  $_[0]->rmNonVanilla;
+  $_[0]->rmEmptySentences;
+  return $_[0];
+}
+
+## $doc = $doc->flat()
+##  + replaces all sentence boundaries with empty tokens
+sub flat {
+  my $doc   = shift;
+  my $sflat = Lingua::TT::Sentence->new;
+  my $eos   = Lingua::TT::Token->new('');
+  @$sflat   = map {(@$_,$eos)} @$doc;
+  pop(@$sflat); ##-- remove final $eos
+  @$doc     = ($sflat);
+  return $doc;
 }
 
 ##==============================================================================
@@ -74,11 +127,37 @@ sub fromString {
   return $_[0];
 }
 
+## $doc = $CLASS_OR_OBJECT->fromFile($filename_or_fh,%opts)
+##  + parses $doc from file
+BEGIN { *load = \&fromFile; }
+sub fromFile {
+  my ($doc,$file,%opts) = @_;
+  my $ttio = Lingua::TT::IO->fromFile($file,%opts)
+    or die((ref($doc)||$doc)."::fromFile(): open failed for '$file': $!");
+  my $got = $ttio->getDocument;
+  $ttio->close();
+  return $got if (!ref($doc));
+  @$doc = @$got;
+  return $doc;
+}
+
+## $doc = $CLASS_OR_OBJECT->toFile($filename_or_fh,%opts)
+##  + saves $doc to file
+BEGIN { *save = \&toFile; }
+sub toFile {
+  my ($doc,$file,%opts) = @_;
+  my $ttio = Lingua::TT::IO->toFile($file,%opts)
+    or die((ref($doc)||$doc)."::toFile(): open failed for '$file': $!");
+  my $rc = $ttio->putDocument($doc);
+  $ttio->close();
+  return $rc ? $doc : undef;
+}
+
 ##==============================================================================
 ## Methods: Shuffle & Split
 
 ## $doc = $doc->shuffle(%opts)
-##  + randomly re-orders sentences in @$doc
+##  + randomly re-orders sentences in @$doc to @$doc2
 ##  + %opts:
 ##    seed => $seed, ##-- calls srand($seed) if defined
 sub shuffle {
@@ -110,6 +189,7 @@ sub splitN {
   }
   return wantarray ? @odocs : \@odocs;
 }
+
 
 ##==============================================================================
 ## Footer
