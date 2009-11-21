@@ -137,7 +137,8 @@ sub toString {
 sub getToken {
   my $io = shift;
   return undef if ($io->eof);
-  return Lingua::TT::Token->newFromString(decode($io->{encoding},$io->{fh}->getline));
+  #return Lingua::TT::Token->newFromString(decode($io->{encoding},$io->{fh}->getline));
+  return bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$io->{fh}->getline))], 'Lingua::TT::Token');
 }
 
 ## $sent_or_undef = $io->getSentence()
@@ -150,7 +151,8 @@ sub getSentence {
   my ($line);
   while (defined($line=$io->{fh}->getline)) {
     last if ($line =~ /^\r?$/);
-    push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
+    #push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
+    push(@$sent, bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$line))], 'Lingua::TT::Token'));
   }
   return $sent;
 }
@@ -159,6 +161,29 @@ sub getSentence {
 ##  + gets next (possibly empty) document from input stream
 ##  + returns undef of EOF
 sub getDocument {
+  my $io = shift;
+  return undef if ($io->eof);
+  my $fh = $io->{fh};
+  my ($buf);
+  {
+    local $/ = undef;
+    $buf = <$fh>;
+  }
+  $buf = decode($io->{encoding},$buf);
+  my $doc   = bless([],'Lingua::TT::Document');
+  @$doc = map {
+    bless([
+	   map {
+	     bless([split(/[\n\r]*[\t\n\r][\n\r]*/,$_)], 'Lingua::TT::Token')
+	   } split(/[\r\n]+/,$_)
+	  ],
+	  'Lingua::TT::Sentence')
+  } split(/(?:\r?\n){2}/, $buf);
+
+  return $doc;
+}
+
+sub getDocument1 {
   my $io = shift;
   return undef if ($io->eof);
   my $doc   = bless([],'Lingua::TT::Document');
@@ -170,7 +195,8 @@ sub getDocument {
       $sent=bless([],'Lingua::TT::Sentence');
       next;
     }
-    push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
+    #push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
+    push(@$sent, bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$line))], 'Lingua::TT::Token'));
   }
   push(@$doc,$sent) if (!$sent->isEmpty);
   return $doc;

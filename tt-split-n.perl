@@ -15,15 +15,11 @@ our $VERSION = "0.01";
 
 ##-- program vars
 our $progname     = basename($0);
-
-our $frac1        = undef;
-our $n1           = undef;
-our $outfile1     = '-';
-our $outfile2     = '-';
-our $srand        = 0;
-our $bytoken      = 0;
-
 our $verbose      = 1;
+
+our $nsplits      = 2;
+our $outfmt       = 'split.%d';
+our $seed         = undef;
 
 our %ioargs = (encoding=>'UTF-8');
 
@@ -37,31 +33,16 @@ GetOptions(##-- general
 	   'verbose|v=i' => \$verbose,
 
 	   ##-- Selection
-	   'bytoken|bytok|token|t!' => \$bytoken,
-	   'bysentence|bysent|sentence|s!' => sub { $bytoken = !$_[1]; },
-	   'frac1|f1|f=f' => \$frac1,
-	   'n1|n=i' => \$n1,
-	   'srand|r=i' => \$srand,
+	   'n-splits|ns|n=i' => \$nsplits,
+	   'seed|srand|s|r=i' => \$seed,
 
 	   ##-- I/O
-	   'output1|o1=s' => \$outfile1,
-	   'output2|o2=s' => \$outfile2,
+	   'output-format|outfmt|output|o=s' => \$outfmt,
 	   'encoding|e=s' => \$ioargs{encoding},
 	  );
 
-pod2usage({
-	   -msg=>'You must specify either -f or -n!',
-	   -exitval=>0,
-	   -verbose=>0
-	  }) if (!$frac1 && !$n1);
-pod2usage({
-	   -exitval=>0,
-	   -verbose=>0
-	  }) if ($help);
-pod2usage({
-	   -exitval=>0,
-	   -verbose=>1
-	  }) if ($man);
+pod2usage({-exitval=>0,-verbose=>0}) if ($help);
+pod2usage({-exitval=>0,-verbose=>1}) if ($man);
 
 if ($version || $verbose >= 2) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
@@ -84,72 +65,57 @@ sub vmsg {
 ##----------------------------------------------------------------------
 push(@ARGV, '-') if (!@ARGV);
 
-##-- set random seed
-srand($srand) if (defined($srand));
-
 ##-- read in source file
 my ($ttin);
-our $doc = Lingua::TT::Document->new();
+our $doc = undef;
 our $ntoks = 0;
 my ($docin);
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for file '$infile': $!");
   $docin = $ttin->getDocument;
-  push(@$doc,@$docin)
+  $ttin->close();
+  if (!defined($doc)) { $doc=$docin; }
+  else                { push(@$doc,@$docin); }
 }
 
-##-- stats
+##-- totals
 $nsents = $doc->nSentences;
 $ntoks  = $doc->nTokens;
-$nitems = $bytoken ? $ntoks : $nsents;
-$n1     = $frac1 * $nitems if (defined($frac1));
 
 ##-- report
 print STDERR
   ("$progname: got $ntoks tokens in $nsents sentences total\n",
   );
 
-##-- output: file 1
-$ntoks1 = $nsents1 = 0;
-our $ttout1 = Lingua::TT::IO->toFile($outfile1,%ioargs)
-  or die("$0: open failed for '$outfile1': $!");
-while (@$doc && $n1 > 0) {
-  $si = int(rand(@$doc));
-  $s  = splice(@$doc,$si,1);
-  $ttout1->putSentence($s);
+##-- shuffle & split
+$doc->shuffle(seed=>$seed);
+our @odocs = $doc->splitN($nsplits);
 
-  ##-- count number of tokens in output files
-  $ntoks1 += @$s;
-  $nsents1++;
-
-  $n1 -= $bytoken ? scalar(@$s) : 1;
+##-- output
+$outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.\d*)d/);
+our @ofiles = map {sprintf($outfmt,$_)} (0..$#odocs);
+foreach $oi (0..$#odocs) {
+  $ttout = Lingua::TT::IO->toFile($ofiles[$oi],%ioargs)
+    or die("$0: open failed for output file '$ofiles[$oi]': $!");
+  $ttout->putDocument($odocs[$oi]);
+  $ttout->close();
 }
-$ttout1->close;
-
-##-- print all remaining sentences as-is to $outfile2
-$ttout2 = Lingua::TT::IO->toFile($outfile2,%ioargs)
-  or die("$0: open failed for '$outfile2': $!");
-$ttout2->putDocument($doc);
-$ttout2->close();
 
 ##-- Summarize
-$ntoks2  = $ntoks - $ntoks1;
-$nsents2 = $nsents - $nsents1;
-
-$flen = length($outfile1) > length($outfile2) ? length($outfile1) : length($outfile2);
-$ilen = length($ntoks);
+our @nosents = map {$_->nSentences} (@odocs);
+our @notoks  = map {$_->nTokens} (@odocs);
+our $flen = length($ofiles[$#ofiles]);
+our $ilen = length($ntoks);
 
 print STDERR
-  (sprintf("\t+ %-${flen}s : %${ilen}d sentences (%6.2f %%)   /   %${ilen}d tokens (%6.2f %%)\n",
-	   $outfile1,
-	   $nsents1, 100.0*$nsents1/$nsents,
-	   $ntoks1, 100.0*$ntoks1/$ntoks),
-sprintf("\t+ %-${flen}s : %${ilen}d sentences (%6.2f %%)   /   %${ilen}d tokens (%6.2f %%)\n",
-	   $outfile2,
-	   $nsents2, 100.0*$nsents2/$nsents,
-	   $ntoks2, 100.0*$ntoks2/$ntoks),
-  );
+  ("$progname Summary:\n",
+   map {
+    sprintf("\t+ %-${flen}s : %${ilen}d sentences (%5.1f %%)   /   %${ilen}d tokens (%5.1f %%)\n",
+	    $ofiles[$_],
+	    $nosents[$_], 100.0*$nosents[$_]/$nsents,
+	    $notoks[$_],  100.0*$notoks[$_]/$ntoks)
+  } (0..$#odocs));
 
 
 __END__
@@ -162,11 +128,11 @@ __END__
 
 =head1 NAME
 
-tt-split2.perl - split up .t, .tt, and .ttt files into two parts
+tt-split-n.perl - split up .t, .tt, and .ttt files into equally sized chunks
 
 =head1 SYNOPSIS
 
- tt-split2.perl OPTIONS [FILE(s)]
+ tt-split-n.perl OPTIONS [FILE(s)]
 
  General Options:
    -help
@@ -174,14 +140,12 @@ tt-split2.perl - split up .t, .tt, and .ttt files into two parts
    -verbose LEVEL
 
  Selection Options
-   -bytoken , -bysentence  ##-- default: -bysentence
-   -frac    FLOAT          ##-- fraction of total items for -output1
-   -n       NSENTS         ##-- absolute number of total items for -output1
+   -n       NSPLITS        ##-- number of output files
    -srand   SEED           ##-- default: none (perl default)
 
  I/O Options:
-   -output1 OUTFILE1
-   -output2 OUTFILE2
+   -outfmt   OUTFMT        ##-- %d will be replaced by split index
+   -encoding ENCODING      ##-- set I/O encoding (default=UTF-8)
 
 =cut
 

@@ -77,11 +77,13 @@ sub fromString {
 ##==============================================================================
 ## Methods: Shuffle & Split
 
-## $doc = $doc->shuffle()
+## $doc = $doc->shuffle(%opts)
 ##  + randomly re-orders sentences in @$doc
-##  + sensitive to current random seed (set with srand($seed))
+##  + %opts:
+##    seed => $seed, ##-- calls srand($seed) if defined
 sub shuffle {
-  my $doc  = shift;
+  my ($doc,%opts) = @_;
+  srand($opts{seed}) if (defined($opts{seed}));
   my @keys = map {rand} @$doc;
   @$doc = @$doc[sort {$keys[$a]<=>$keys[$b]} (0..$#$doc)];
   return $doc;
@@ -89,10 +91,11 @@ sub shuffle {
 
 ##  @docs = $doc->splitN($n)  ##-- array context
 ## \@docs = $doc->splitN($n)  ##-- scalar context
-##  + splits $doc into $n roughly equally-sized @docs
+##  + splits $doc deterministically into $n roughly equally-sized @docs
 ##  + sentence data is shared (refs) between $doc and @docs
+##  + for a random split, call $doc->shuffle(seed=>$seed)->splitN($n)
 sub splitN {
-  my ($doc,$n) = @_;
+  my ($doc,$n,%opts) = @_;
   my @odocs  = map {$doc->new} (1..$n);
   my @osizes = map {0} @odocs;
   my ($sent,$oi,$oi_min);
