@@ -83,7 +83,29 @@ sub test_diff_1 {
 
   print STDERR "$0: test_diff_1() done: what now?\n";
 }
-test_diff_1();
+#test_diff_1();
+
+##----------------------------------------------------------------------
+use Lingua::TT::Diff;
+sub test_tt_diff {
+  my ($file1,$file2) = @_;
+  #$file1 = "tiger.1k.orig.ttt" if (!$file1);
+  #$file2 = "tiger.1k.tok.tt"  if (!$file2);
+  ##--
+  $file1 = "tiger.utf8.orig.ttt" if (!$file1);
+  $file2 = "tiger.utf8.tok.tt"  if (!$file2);
+  ##
+  my $doc1 = Lingua::TT::Document->load($file1);
+  my $doc2 = Lingua::TT::Document->load($file2);
+  my $diff = Lingua::TT::Diff->new(
+				   cmpEOS=>0,
+				  );
+  $diff->compare($doc1,$doc2);
+  $diff->dump('-', verbose=>1);
+
+  print STDERR "$0: test_tt_diff() done: what now?\n";
+}
+test_tt_diff(@ARGV);
 
 ##======================================================================
 ## MAIN (dummy)

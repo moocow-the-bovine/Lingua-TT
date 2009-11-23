@@ -1,7 +1,7 @@
 #!/bin/sh
 
-. `dirname $0`/cmdutils.sh
-if has_help_option "$@" || [ $# -lt 1 ] ; then
+#. `dirname $0`/cmdutils.sh#
+if test $# -lt 1 -o "$1" = "-h" -o "$1" = "--help" ; then
     echo "Usage: $0 TAG_PREFIX_LENGTH TTFILE(s)"
     exit 0
 fi

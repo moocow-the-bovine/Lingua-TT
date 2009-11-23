@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if test -z "$*"; then
+if test -z "$*" -o "$1" = '-h' -o "$1" = "--help" ; then
   echo "Usage: $0 TTFILE(s)"
   echo " + concatenate .tt files, adding implicit EOS between files"
   echo " + pipe to tt-eosnorm.perl to avoid redundant EOS"
