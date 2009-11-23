@@ -237,13 +237,16 @@ sub compare {
 ##==============================================================================
 ## Methods: I/O
 
-## $diff = $diff->dump($outfile_or_fh,%opts)
+##----------------------------------------------------------------------
+## Methods: I/O: Dump
+
+## $diff = $diff->dumpContextDiff($outfile_or_fh,%opts)
 ##  + %opts:
 ##     label1  => $label1,  ##-- default: $diff->{file1} || 'doc1'
 ##     label2  => $label2,  ##-- default: $diff->{file2} || 'doc2'
 ##     context => $nlines,  ##-- default=4
 ##     verbose => $bool,    ##-- produce verbose diff or "real" diff (default=false: "real" diff)
-sub dump {
+sub dumpContextDiff {
   my ($diff,$file,%opts) = @_;
   %opts = (context=>4,
 	   label1=>($diff->{file1} || 'doc1'),
@@ -317,6 +320,121 @@ sub dump {
   $fh->print("\n");
 
   return $diff;
+}
+
+##----------------------------------------------------------------------
+## Methods: I/O: Text
+
+## $diff = $diff->saveTextFile($filename_or_fh,%opts)
+##  + stores text representation of $diff to $filename_or_fh
+##  + %opts:
+##     header => $bool, ##-- store header? (default=1)
+sub saveTextFile {
+  my ($diff,$file,%opts) = @_;
+  my $fh = ref($file) ? $file : IO::File->new(">$file");
+  confess(ref($diff)."::saveTextFile(): open failed for '$file': $!") if (!defined($fh));
+
+  ##-- dump: header
+  $opts{header} = 1 if (!defined($opts{header}));
+  $fh->print("=== file1: $diff->{file1}\n",
+	     "=== file2: $diff->{file2}\n",
+	     (map {"=== $_: ".($diff->{$_} ? 1 : 0)."\n"} qw(cmpEOS cmpComments cmpEmpty)),
+	     "=== ss1: ", join(' ', @{$diff->{ss1}}), "\n",
+	     "=== ss2: ", join(' ', @{$diff->{ss2}}), "\n",
+	     "=== sw1: ", join(' ', @{$diff->{sw1}}), "\n",
+	     "=== sw2: ", join(' ', @{$diff->{sw2}}), "\n",
+	    ) if ($opts{header});
+
+  ##-- dump: hunks (traditional diff format)
+  $fh->print("--- HUNKS (".scalar(@{$diff->{hunks}}).")\n");
+  my ($seq1,$seq2,$doc1,$doc2,$ss1,$ss2,$sw1,$sw2) = @$diff{qw(seq1 seq2 doc1 doc2 ss1 ss2 sw1 sw2)};
+  my ($hunk, $bits,$min1,$max1,$min2,$max2, $addr,$sep);
+  foreach $hunk (@{$diff->{hunks}}) {
+    ($bits,$min1,$max1,$min2,$max2) = @$hunk;
+    next if (!$bits);
+    if    ($bits == 1) { $addr = "${min1},${max1}d${min2}"; $sep=''; }
+    elsif ($bits == 2) { $addr = "${min1}a,${min2},${max2}"; $sep=''; }
+    else               { $addr = "${min1},${max1}c${min2},${max2}"; $sep="---\n"; }
+    $fh->print($addr, "\n",
+	       #(map {"< $_\n"} @$seq1[$min1..$max1]),
+	       #$sep,
+	       #(map {"> $_\n"} @$seq2[$min2..$max2]),
+	       ##--
+	       (map {"< ".$doc1->[$ss1->[$_]][$sw1->[$_]]->toString."\n"} ($min1..$max1)),
+	       $sep,
+	       (map {"> ".$doc2->[$ss2->[$_]][$sw2->[$_]]->toString."\n"} ($min2..$max2)),
+	      );
+  }
+  $fh->close() if (!ref($file));
+  return $diff;
+}
+
+## $diff = $CLASS_OR_OBJ->loadTextFile($filename_or_fh,%opts)
+##  + %opts: (none)
+sub loadTextFile {
+  my ($diff,$file,%opts) = @_;
+  $diff = $diff->new if (!ref($diff));
+  my $fh = ref($file) ? $file : IO::File->new("<$file");
+  confess(ref($diff)."::loadTextFile(): open failed for '$file': $!") if (!defined($fh));
+
+  ##-- load
+  my %op2bits = (a=>2,c=>3,d=>1);
+  my $hunks = $diff->{hunks} = [];
+  my ($line, $bits,$min1,$max1,$min2,$max2);
+  while (defined($line=<$fh>)) {
+    #chomp($line);
+    if      ($line =~ /^\=\=\= (s[sw][12]): (.*)$/) {
+      $diff->{$1} = [split(/\s+/,$2)];
+    }
+    elsif ($line =~ /^\=\=\= (\w+): (.*)$/) {
+      $diff->{$1} = $2;
+    }
+    elsif ($line =~ /^(\d+)(?:\,(\d+))?([acd])(\d+)(?:\,(\d+))?$/) {
+      $bits = $op2bits{$3};
+      ($min1,$max1,$min2,$max2) = ($1,$2,$4,$5);
+      $max1 = $min1 if (!defined($max1));
+      $max2 = $min2 if (!defined($max2));
+      push(@$hunks, [$bits, $min1,$max1,$min2,$max2]);
+    }
+    ##-- ignore others
+  }
+  $fh->close() if (!ref($file));
+
+  return $diff;
+}
+
+##----------------------------------------------------------------------
+## Methods: I/O: Binary
+
+## $diff = $diff->saveBinFile($filename_or_fh)
+sub saveBinFile {
+  require Storable;
+  my ($diff,$file) = @_;
+  my ($rc);
+  if (ref($file)) {
+    $rc = Storable::store_fd($diff,$file);
+  } else {
+    $rc = Storable::store($diff,$file);
+  }
+  return $rc ? $diff : undef;
+}
+
+
+## $diff = $CLASS_OR_OBJ->loadBinFile($filename_or_fh)
+sub loadBinFile {
+  require Storable;
+  my ($diff,$file) = @_;
+  my ($ref,$rc);
+  if (ref($file)) {
+    $ref = Storable::retrieve_fd($file);
+  } else {
+    $ref = Storable::retrieve($file);
+  }
+  if (ref($diff)) {
+    %$diff = %$ref;
+    return $diff;
+  }
+  return $ref;
 }
 
 
