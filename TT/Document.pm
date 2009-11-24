@@ -98,16 +98,18 @@ sub canonicalize {
   return $_[0];
 }
 
-## $doc = $doc->flat()
-##  + replaces all sentence boundaries with empty tokens
+## $tokens = $doc->flat()
+##  + returns flat list of pseudo-tokens (sentence boundaries replaced with "empty" tokens)
 sub flat {
   my $doc   = shift;
   my $sflat = Lingua::TT::Sentence->new;
   my $eos   = Lingua::TT::Token->new('');
   @$sflat   = map {(@$_,$eos)} @$doc;
   pop(@$sflat); ##-- remove final $eos
-  @$doc     = ($sflat);
-  return $doc;
+  #@$doc     = ($sflat);
+  #return $doc;
+  ##--
+  return $sflat;
 }
 
 ##==============================================================================

@@ -164,7 +164,7 @@ sub getSentence {
 }
 
 ## $doc_or_undef = $io->getDocument()
-##  + gets next (possibly empty) document from input stream
+##  + gets all remaining data from input stream as a Lingua::TT:Document
 ##  + returns undef of EOF
 sub getDocument {
   my $io = shift;
@@ -188,6 +188,24 @@ sub getDocument {
 
   return $doc;
 }
+
+## \@lines = $io->getLines();   ##-- scalar context
+##  @lines = $io->getLines();   ##-- array context
+##  + gets all remaining data from input stream as a flat list of (decoded) strings
+##  + returns undef of EOF
+sub getLines {
+  my $io = shift;
+  return undef if ($io->eof);
+  my $fh = $io->{fh};
+  my ($buf);
+  {
+    local $/ = undef;
+    $buf = decode($io->{encoding},scalar(<$fh>));
+  }
+  my $lines = [split(/\r?\n/, $buf)];
+  return wantarray ? @$lines : $lines;
+}
+
 
 ##==============================================================================
 ## Methods: I/O: Output

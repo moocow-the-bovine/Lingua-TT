@@ -55,11 +55,8 @@ sub test_diff_1 {
   my $doc1 = Lingua::TT::Document->fromFile('test1.t');
   my $doc2 = Lingua::TT::Document->fromFile('test2.t');
 
-  my $d1 = $doc1->copy(-1)->canonicalize->flat;
-  my $d2 = $doc2->copy(-1)->canonicalize->flat;
-
-  my $s1 = $d1->[0];
-  my $s2 = $d2->[0];
+  my $s1 = $doc1->copy(-1)->canonicalize->flat;
+  my $s2 = $doc2->copy(-1)->canonicalize->flat;
   my $keysub = sub {return $_[0][0]};
 
   my $diff0 = Algorithm::Diff::diff($s1,$s2, $keysub);
@@ -89,23 +86,36 @@ sub test_diff_1 {
 use Lingua::TT::Diff;
 sub test_tt_diff {
   my ($file1,$file2) = @_;
-  #$file1 = "tiger.utf8.orig.1k.ttt" if (!$file1);
-  #$file2 = "tiger.utf8.tok.1k.tt"  if (!$file2);
   ##--
-  $file1 = "tiger.utf8.orig.ttt" if (!$file1);
-  $file2 = "tiger.utf8.tok.tt"  if (!$file2);
+  #$file1 = "tiger.utf8.orig.32.tt" if (!$file1);
+  #$file2 = "tiger.utf8.tok.32.tt"  if (!$file2);
+  ##--
+  $file1 = "tiger.utf8.orig.1k.tt" if (!$file1);
+  $file2 = "tiger.utf8.tok.1k.tt"  if (!$file2);
+  ##--
+  #$file1 = "tiger.utf8.orig.tt" if (!$file1);
+  #$file2 = "tiger.utf8.tok.tt"  if (!$file2);
   ##
-  my $doc1 = Lingua::TT::Document->load($file1);
-  my $doc2 = Lingua::TT::Document->load($file2);
-  my $diff = Lingua::TT::Diff->new(
-				   cmpEOS=>0,
-				  );
-  $diff->compare($doc1,$doc2);
-  #$diff->dumpContextDiff('-', verbose=>1);
-  #$diff->saveTextFile('-', header=>0);
+  #my $seq1 = Lingua::TT::IO->fromFile($file1)->getLines;
+  #my $seq2 = Lingua::TT::IO->fromFile($file2)->getLines;
+  #my $diff = Lingua::TT::Diff->new();
+  #$diff->compare($seq1,$seq2);
 
+  my $diff = Lingua::TT::Diff->new();
+  $diff->compare($file1,$file2, encoding=>'UTF-8');
+
+  ##--
+  #$diff->dumpContextDiff('-', verbose=>1);
+
+  ##--
+  if (@ARGV) {
+    $diff->saveTextFile('-');
+    exit(0);
+  }
   $diff->saveTextFile('tmp1.ttd');
   my $diff2 = ref($diff)->loadTextFile('tmp1.ttd');
+  #$diff2->saveTextFile('-');
+  $diff2->saveTextFile('tmp2.ttd');
 
   print STDERR "$0: test_tt_diff() done: what now?\n";
 }

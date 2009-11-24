@@ -22,60 +22,53 @@ our $DIFF = 'diff'; ##-- search in path
 
 ## $diff = CLASS_OR_OBJECT->new(%opts)
 ## + %$diff, %opts
-##   ##-- objects to compare
-##   doc1 => $doc1,    ##-- Lingua:TT::Document object (e.g. training)
-##   doc2 => $doc2,    ##-- Lingua:TT::Document object (e.g. tokenizer output)
-##   file1 => $file1,  ##-- sequence dump file for $doc1 (default=temp)
-##   file2 => $file2,  ##-- sequence dump file for $doc2 (default=temp)
+##   ##-- sequences to compare
+##   seq1  => \@seq1,     ##-- raw TT line data (default: EMPTY); see $diff->sequenceXYZ() methods
+##   seq2  => \@seq2,     ##-- raw TT line data (default: EMPTY); see $diff->sequenceXYZ() methods
 ##   ##
-##   ##-- comparison options
-##   cmpEOS => $bool,        ##-- if true, sentence boundaries will be compared (default=true)
-##   cmpComments => $bool,   ##-- if true, non-vanilla tokens will be compared  (default=false)
-##   cmpEmpty => $bool,      ##-- if true, empty tokens will be compared        (default=false)
+##   file1 => $file1,     ##-- source name for $seq1 (default: none)
+##   file2 => $file2,     ##-- source name for $seq2 (default: none)
+##   ##
+##   key1  => \&keysub,   ##-- keygen sub for $seq1 (default=\&ksText), called as $key=$keysub->($diff,$line)
+##   key2  => \&keysub,   ##-- keygen sub for $seq2 (default=\&ksText), called as $key=$keysub->($diff,$line)
+##   ##
+##   ##-- misc options
+##   keeptmp => $bool,    ##-- if true, temp files will not be unlinked (default=false)
 ##   ##
 ##   ##-- cache data
-##   tmp1 => $bool,    ##-- true iff $file1 is a temp
-##   tmp2 => $bool,    ##-- true iff $file2 is a temp
-##   seq1 => \@seq1,   ##-- raw (text) strings to compare
-##   seq2 => \@seq2,   ##-- raw (text) strings to compare
-##   ss1  => \@ss1,    ##-- $doc1 sentence indices: [$seq1i]=>$doc1_sent_i
-##   ss2  => \@ss2,    ##-- $doc2 sentence indices: [$seq2i]=>$doc2_sent_i
-##   sw1  => \@sw1,    ##-- $doc1 token indices:    [$seq1i]=>$doc1_tok_i  : $w1 = $doc1[$ss1[$seq1i]][$sw1[$seq1i]]
-##   sw2  => \@sw2,    ##-- $doc2 token indices:    [$seq2i]=>$doc2_tok_i  : $w2 = $doc2[$ss2[$seq2i]][$sw2[$seq2i]]
+##   tmpfile1 => $tmp1,   ##-- filename: temporary key-file dump for $seq1
+##   tmpfile2 => $tmp2,   ##-- filename: temporary key-file dump for $seq2
 ##   ##
 ##   ##-- diff data
-##   hunks => \@hunks, ##-- difference hunks: [$hunk1,$hunk2,...]
-##                     ## + each $hunk is: [$bitMask, $min1seqi,$max1seqi, $min2seqi,$max2seqi]
+##   hunks => \@hunks,    ##-- difference hunks: [$hunk1,$hunk2,...]
+##                        ## + each $hunk is: [$opCode, $min1,$max1, $min2,$max2]
+##                        ## + $opCode is as for traditional 'diff':
+##                        ##   'a' (add)   : Add     @$seq2[$min2..$max2], align after ($min1==$max1) of $seq1
+##                        ##   'd' (delete): Delete  @$seq1[$min1..$max1], align after ($min2==$max2) of $seq2
+##                        ##   'c' (change): Replace @$seq1[$min1..$max1] with @$seq2[$min2..$max2]
 sub new {
   my $that = shift;
   my $diff = bless({
-		    ##-- docs to compare
-		    doc1=>undef,
-		    doc2=>undef,
-		    #file1=>undef,
-		    #file2=>undef,
-
-		    ##-- options
-		    cmpEOS => 1,
-		    cmpEmpty => 0,
-		    cmpComments => 0,
+		    ##-- sequences to compare
+		    seq1 => [],
+		    seq2 => [],
+		    file1=>undef,
+		    file2=>undef,
+		    key1 => \&ksText,
+		    key2 => \&ksText,
 
 		    ##-- cache data
-		    ss1=>undef,
-		    ss2=>undef,
-		    sw1=>undef,
-		    sw2=>undef,
+		    tmpfile1 => undef,
+		    tmpfile2 => undef,
+		    keeptmp  => 0,
 
 		    ##-- diff data
-		    hunks=>undef,
+		    hunks => [],
 
 		    ##-- user args
 		    @_,
 		   }, ref($that)||$that);
 
-  $diff->indexDocument($diff->{doc1}) if (defined($diff->{doc1}));
-  $diff->indexDocument($diff->{doc2}) if (defined($diff->{doc2}));
-  $diff->compare() if ($diff->{doc1} && $diff->{doc2});
   return $diff;
 }
 
@@ -84,101 +77,161 @@ sub new {
 sub reset {
   my $diff = shift;
   $diff->clearCache;
-  delete(@$diff{qw(doc1 doc2 file1 file2 tmp1 tmp2 hunks)});
+  @{$diff->{seq1}} = qw();
+  @{$diff->{seq2}} = qw();
+  @{$diff->{hunks}} = qw();
+  delete(@$diff{qw(file1 file2)});
   return $diff;
 }
 
 ## $diff = $diff->clearCache()
-##  + clears cached indices & flat sequences, etc.
+##  + clears & unlinks cached temp files
 sub clearCache {
   my $diff = shift;
-  delete(@$diff{qw(seq1 seq2 ss1 ss2 sw1 sw2)});
-  delete($diff->{file1}) if ($diff->{tmp1});
-  delete($diff->{file2}) if ($diff->{tmp2});
-  delete(@$diff{qw(tmp1 tmp2)});
+  #@{$diff->{seq1}} = qw();
+  #@{$diff->{seq2}} = qw();
+  unlink($_) foreach (grep {!$diff->{keeptmp} && defined($_)} @$diff{qw(tmpfile1 tmpfile2)});
+  delete(@$diff{qw(tmpfile1 tmpfile2)});
   return $diff;
 }
 
 ##==============================================================================
-## Methods: Low-Level
+## Methods: Key Generation Subs
 
-## $seq = $diff->indexDocument($doc,$which)
-##  + creates @$diff{"ss$i","idx$i"} from $obj
-sub indexDocument {
-  my ($diff,$doc,$which) = @_;
-  $which = 1 if (!defined($which));
-
-  $diff->{"doc${which}"} = $doc;
-  my $seq = $diff->{"seq${which}"} = [];
-  my $ss  = $diff->{"ss${which}"}  = [];
-  my $sw  = $diff->{"sw${which}"}  = [];
-
-  my ($si,$wi, $s,$w);
-  foreach $si (0..$#$doc) {
-    $s = $doc->[$si];
-    foreach $wi (0..$#$s) {
-      $w = $s->[$wi];
-      next if (!$diff->{cmpComments} && $w->isComment);
-      next if (!$diff->{cmpEmpty}    && $w->isEmpty);
-      push(@$seq, defined($w->[0]) ? $w->[0] : '');
-      push(@$ss,  $si);
-      push(@$sw,  $wi);
-    }
-    if ($diff->{cmpEOS}) {
-      push(@$seq, '');
-      push(@$ss,  $si);
-      push(@$sw,  $#$s+1);
-    }
-  }
-
-  ##-- add final pseudo-elements to sequence backtranslation indices
-  push(@$ss, $#$doc+1);
-  push(@$sw, $#$s+1);
-
-  return $diff;
+## $key = $diff->ksText($line)
+##  + key-generation sub: 'text' field
+sub ksText {
+  return ($_[1] =~ /^([^\t\n\r]*)/ ? $1 : '');
 }
 
-## $seqfile = $diff->seqFile($which)
-##  + creates temporary file for $diff->{"seq${which}"}
-sub seqFile {
+## $key = $diff->ksTag($line)
+##  + key-generation sub: 'tag' field
+sub ksTag {
+  return ($_[1] =~ /^[^\t]*[\t\n\r][\n\r]*([^\t]*)/ ? $1 : '');
+}
+
+## $key = $diff->ksAll($line)
+##  + key-generation sub: entire line
+sub ksAll {
+  return $_[1];
+}
+
+
+##==============================================================================
+## Methods: Sequence Selection
+
+##----------------------------------------------------------------------
+## Methods: Sequence Selection: High-Level
+
+## $diff = $diff->seq1($src,%opts)
+##  + wrapper for $diff->setSequence(1,...)
+sub seq1 {
+  return $_[0]->setSequence(1,@_[1..$#_]);
+}
+
+## $diff = $diff->seq2($src,%opts)
+##  + wrapper for $diff->setSequence(2,...)
+sub seq2 {
+  return $_[0]->setSequence(2,@_[1..$#_]);
+}
+
+## $diff = $diff->setSequence($which,$src,%opts)
+##   + sets sequence $which (1 or 2) from $src
+##   + $src may be one of the following:
+##     - a Lingua::TT::Sentence object
+##     - a Lingua::TT::Document object
+##     - a Lingua::TT::IO object
+##     - a flat array-ref of line-strings (without terminating newlines)
+##     - a filehandle
+##     - a filename
+BEGIN { *isa = \&UNIVERSAL::isa; }
+sub setSequence {
+  my ($diff,$i,$src,%opts) = @_;
+  $i = $diff->checkWhich($i);
+  if (isa($src,'Lingua::TT::Sentence')) {
+    return $diff->sequenceSentence($i,$src,%opts);   ##-- Lingua::TT::Sentence
+  }
+  elsif (isa($src,'Lingua::TT::Document')) {
+    return $diff->sequenceDocument($i,$src,%opts);   ##-- Lingua::TT::Document
+  }
+  elsif (isa($src,'Lingua::TT::IO')) {
+    return $diff->sequenceIO($i,$src,%opts);         ##-- Lingua::TT::IO
+  }
+  elsif (isa($src,'IO::Handle')) {
+    return $diff->sequenceFile($i,$src,%opts);       ##-- IO::Handle
+  }
+  elsif (isa($src,'ARRAY')) {
+    return $diff->sequenceLines($i,$src,%opts);      ##-- array of lines
+  }
+  elsif (!ref($src)) {
+    return $diff->sequenceFile($i,$src,%opts);       ##-- filename
+  }
+  ##
+  return $diff->sequenceFile($i,$src,%opts);         ##-- other ref; maybe a filehandle?
+}
+
+##----------------------------------------------------------------------
+## Methods: Sequence Selection: Low-Level
+
+## $which = $diff->checkWhich($which)
+##  + common sanity check for '$which' values (1 or 2)
+sub checkWhich {
   my ($diff,$which) = @_;
-  $which = 1 if (!$which);
-
-  ##-- sanity check(s)
-  confess(ref($diff)."::seqFile($which): sequence '$which' is not defined!") if (!$diff->{"seq${which}"});
-
-  ##-- get tempfile
-  my ($fh,$filename);
-  if (defined($filename=$diff->{"file${which}"})) {
-    $fh = IO::File->new(">$filename");
-    $diff->{"tmp${which}"} = 0;
-  } else {
-    ($fh,$filename) = File::Temp::tempfile("ttdiff_XXXX", SUFFIX=>'.t0');
-    $diff->{"file${which}"} = $filename;
-    $diff->{"tmp${which}"} = 1;
+  $which = 0 if (!defined($which));
+  if ($which != 1 && $which != 2) {
+    confess(ref($diff)."::checkWhich(): sequence \$which must be 1 or 2 (got='$which'): assuming '1'");
+    return 1;
   }
-  confess(ref($diff)."::seqFile($which): open failed for '$filename': $!") if (!defined($fh));
-
-  ##-- dump
-  $fh->print(map {$_."\n"} @{$diff->{"seq${which}"}});
-  $fh->close();
-
-  return $filename;
+  return $which;
 }
 
-##==============================================================================
-## Methods: Document selection
-
-## $diff = $diff->doc1($doc1)
-##  + set 1st document to compare
-sub doc1 {
-  $_[0]->indexDocument($_[1],1);
+## $diff = $diff->sequenceDocument($which,$doc)
+##  + populate sequence $which (1 or 2) from Lingua::TT::Document $doc
+##  + calls $diff->sequenceSentence()
+sub sequenceDocument {
+  my ($diff,$which,$doc) = @_;
+  $which = $diff->checkWhich($which);
+  $diff->{"file${which}"}   = "$doc";     ##-- ugly but at least non-empty
+  @{$diff->{"seq${which}"}} = map {join("\t",@$_)} @{$doc->flat};
+  return $diff;
 }
 
-## $diff = $diff->doc2($doc2)
-##  + set 2nd document to compare
-sub doc2 {
-  $_[0]->indexDocument($_[1],2);
+## $diff = $diff->sequenceSentence($which,$sent)
+##  + populate sequence $which (1 or 2) from Lingua::TT::Sentence $sent
+sub sequenceSentence {
+  my ($diff,$which,$sent) = @_;
+  $which = $diff->checkWhich($which);
+  $diff->{"file${which}"}   = "$sent";    ##-- ugly but at least non-empty
+  @{$diff->{"seq${which}"}} = map {join("\t",@$_)} @$sent;
+  return $diff;
+}
+
+## $diff = $diff->sequenceLines($which,\@lines)
+##  + populate sequence $which (1 or 2) from \@lines
+sub sequenceLines {
+  my ($diff,$which,$lines) = @_;
+  $which = $diff->checkWhich($which);
+  $diff->{"file${which}"}   = "$lines";
+  @{$diff->{"seq${which}"}} = @$lines;
+  return $diff;
+}
+
+## $diff = $diff->sequenceIO($which,$ttio)
+##  + populate sequence $which (1 or 2) from Lingua::TT::IO $ttio
+sub sequenceIO {
+  my ($diff,$which,$ttio) = @_;
+  $which = $diff->checkWhich($which);
+  $diff->{"file${which}"}   = $ttio->{name};
+  @{$diff->{"seq${which}"}} = $ttio->getLines;
+  return $diff;
+}
+
+## $diff = $diff->sequenceFile($which,$filename_or_fh,%opts)
+##   + generate sequence $which (1 or 2) from $filename_or_fh
+##   + %opts are passed to Lingua::TT::IO->new()
+sub sequenceFile {
+  my ($diff,$which,$file,%opts) = @_;
+  return $diff->sequenceIO($which,Lingua::TT::IO->fromFile($file,%opts));
 }
 
 
@@ -186,140 +239,110 @@ sub doc2 {
 ## Methods: Comparison
 
 ## $diff = $diff->compare()
-## $diff = $diff->compare($doc2)
-## $diff = $diff->compare($doc1,$doc2)
-##  + compare documents, wrapping doc1(), doc2() calls if enough arguments are supplied
+## $diff = $diff->compare($src2)
+## $diff = $diff->compare($src1,$src2,%opts)
+##  + compare currently selected sequences, wrapping setSequence() calls if required
 sub compare {
-  my $diff = shift;
+  my ($diff,$src1,$src2,%opts) = @_;
 
-  ##-- args: docs
-  $diff->doc1(shift) if (@_ >= 2);
-  $diff->doc2(shift) if (@_);
+  ##-- args: sequences
+  $diff->seq1($src1,%opts) if (defined($src1));
+  $diff->seq2($src2,%opts) if (defined($src2));
 
   ##-- sanity check(s)
-  confess(ref($diff)."::compare(): {doc1} undefined!") if (!$diff->{doc1});
-  confess(ref($diff)."::compare(): {doc2} undefined!") if (!$diff->{doc2});
+  confess(ref($diff)."::compare(): {seq1} undefined!") if (!$diff->{seq1});
+  confess(ref($diff)."::compare(): {seq2} undefined!") if (!$diff->{seq2});
 
   ##-- create temp files
-  my $file1 = $diff->seqFile(1);
-  my $file2 = $diff->seqFile(2);
+  my $file1 = $diff->seqTempFile(1);
+  my $file2 = $diff->seqTempFile(2);
 
   ##-- compute & parse the diff (external call)
   my $fh = IO::File->new("$DIFF $file1 $file2|")
     or die(ref($diff)."::compare(): could not open pipe from system diff '$DIFF': $!");
-  my ($min1,$min2,$max1,$max2) = (0,0,0,0);
-  my $bits  = 0;
-  my $hunks = $diff->{hunks} = [];
-  my %op2bits = (a=>2,c=>3,d=>1);
+  binmode($fh,':utf8');
+  my ($op,$min1,$min2,$max1,$max2) = ('',0,0,0,0);
+  @{$diff->{hunks}} = qw();
+  my $hunks = $diff->{hunks};
   my ($line);
   while (defined($line=<$fh>)) {
-    if    ($line =~ /^(\d+)(?:\,(\d+))?([acd])(\d+)(?:\,(\d+))?$/) {
-      $bits = $op2bits{$3};
-      ($min1,$max1,$min2,$max2) = ($1,$2,$4,$5);
+    if ($line =~ /^(\d+)(?:\,(\d+))?([acd])(\d+)(?:\,(\d+))?$/) {
+      ($min1,$max1, $op, $min2,$max2) = ($1,$2, $3, $4,$5);
     }
     else {
       next; ##-- ignore
     }
+    if    ($op eq 'a') { $max1=$min1++; }
+    elsif ($op eq 'd') { $max2=$min2++; }
     $max1 = $min1 if (!defined($max1));
     $max2 = $min2 if (!defined($max2));
-    push(@$hunks, [$bits, map {$_-1} $min1,$max1,$min2,$max2]);
+    push(@$hunks, [$op, map {$_-1} $min1,$max1,$min2,$max2]);
   }
   $fh->close;
 
   ##-- unlink temp files
-  unlink($file1) if ($diff->{tmp1});
-  unlink($file2) if ($diff->{tmp2});
-  delete(@$diff{qw(tmp1 tmp2)});
+  if (!$diff->{keeptmp}) {
+    unlink($file1);
+    unlink($file2);
+    delete(@$diff{qw(tmpfile1 tmpfile2)});
+  }
 
   return $diff;
+}
+
+##----------------------------------------------------------------------
+## Methods: Comparison: Low-Level
+
+## $tmpfile = $diff->seqTempFile($which)
+##  + creates temporary key-dump file $seq->{"tmpfile${which}"} for $diff->{"seq${which}"}
+sub seqTempFile {
+  my ($diff,$which) = @_;
+
+  ##-- sanity check(s)
+  $which = $diff->checkWhich($which);
+  confess(ref($diff)."::seqFile($which): sequence '$which' is not defined!")
+    if (!$diff->{"seq${which}"});
+
+  ##-- get tempfile
+  my ($fh,$filename) = File::Temp::tempfile("ttdiff_XXXX", SUFFIX=>'.t0', UNLINK=>(!$diff->{keeptmp}) );
+  confess(ref($diff)."::seqFile($which): open failed for '$filename': $!") if (!defined($fh));
+  binmode($fh,':utf8');
+
+  ##-- dump
+  my $keysub = $diff->{"key${which}"};
+  if (defined($keysub)) {
+    $fh->print(map {$keysub->($diff,$_)."\n"} @{$diff->{"seq${which}"}});
+  } else {
+    $fh->print(@{$diff->{"seq${which}"}});
+  }
+  $fh->close();
+
+  return $diff->{"tmpfile${which}"} = $filename;
 }
 
 ##==============================================================================
 ## Methods: I/O
 
 ##----------------------------------------------------------------------
-## Methods: I/O: Dump
+## Methods: I/O: Low-Level
 
-## $diff = $diff->dumpContextDiff($outfile_or_fh,%opts)
-##  + %opts:
-##     label1  => $label1,  ##-- default: $diff->{file1} || 'doc1'
-##     label2  => $label2,  ##-- default: $diff->{file2} || 'doc2'
-##     context => $nlines,  ##-- default=4
-##     verbose => $bool,    ##-- produce verbose diff or "real" diff (default=false: "real" diff)
-sub dumpContextDiff {
-  my ($diff,$file,%opts) = @_;
-  %opts = (context=>4,
-	   label1=>($diff->{file1} || 'doc1'),
-	   label2=>($diff->{file2} || 'doc2'),
-	   verbose=>0,
-	   %opts);
-  $opts{context} = 4 if (!defined($opts{context}));
-
-  my $fh = ref($file) ? $file : IO::File->new(">$file");
-  confess(ref($diff)."::dump(): open failed for '$file': $!") if (!defined($fh));
-
-  $fh->print("*** $opts{label1}\n",
-	     "--- $opts{label2}\n");
-  my ($seq1,$seq2, $ss1,$sw1, $ss2,$sw2) = @$diff{qw(seq1 seq2 ss1 sw1 ss2 sw2)};
-  my ($hunk, $bits,$min1,$max1,$min2,$max2,$i);
-  my ($min1c,$max1c,$min2c,$max2c);
-  my ($hunkid1,$hunkid2, $code1,$code2);
-  foreach $hunk (@{$diff->{hunks}}) {
-    ($bits,$min1,$max1,$min2,$max2) = @$hunk;
-    next if (!$bits);
-
-    ##-- add context
-    ($min1c,$min2c) = map {$_<0 ? 0 : $_} map {$_-$opts{context}} ($min1,$min2);
-    ($max1c,$max2c) = map {$_+$opts{context}} ($max1,$max2);
-    ($min1c,$max1c) = map {$_ > $#$seq1 ? $#$seq1 : $_} ($min1c,$max1c);
-    ($min2c,$max2c) = map {$_ > $#$seq2 ? $#$seq2 : $_} ($min2c,$max2c);
-
-    ##-- hunk ids
-    $hunkid1 = ("*** ".($min1c+1).','.($max1c+1)." ***"
-		.($opts{verbose} ? " ($min1:$ss1->[$min1].$sw1->[$min1] , $max1:$ss1->[$max1].$sw1->[$max1])" : ''));
-    $hunkid2 = ("--- ".($min2c+1).','.($max2c+1)." ---"
-		.($opts{verbose} ? " ($min2:$ss2->[$min2].$sw2->[$min2] , $max2:$ss2->[$max2].$sw2->[$max2])" : ''));
-
-    if    ($bits==3) {
-      ##-- changed items in $seq1 and $seq2
-      $code1=$code2='! ';
-    }
-    elsif ($bits==2) {
-      $code1='? '; ##-- should never be needed!
-      $code2='+ ';
-    }
-    elsif ($bits==1) {
-      $code1='- ';
-      $code2='? '; ##-- should never be needed!
-    }
-
-    ##-- dump this hunk
-    $fh->print(
-	       ("*" x 15), "\n", ##-- header
-	       $hunkid1, "\n",
-	       (($bits&1)
-		? (
-		   (map {('  ',   $seq1->[$_], "\n")}  ($min1c..($min1-1))), ##-- context.BEFORE
-		   (map {($code1, $seq1->[$_], "\n")}  ($min1..$max1)),      ##-- hunk.1
-		   (map {('  ',   $seq1->[$_], "\n")}  (($max1+1)..$max1c)), ##-- context.AFTER
-		  )
-		: qw()),
-	       ##
-	       $hunkid2, "\n",
-	       (($bits&2)
-		? (
-		   (map {('  ',   $seq2->[$_], "\n")}  ($min2c..($min2-1))), ##-- context.BEFORE
-		   (map {($code2, $seq2->[$_], "\n")}  ($min2..$max2)),      ##-- hunk.2
-		   (map {('  ',   $seq2->[$_], "\n")}  (($max2+1)..$max2c)), ##-- context.AFTER
-		  )
-		: qw()),
-	      );
-  }
-
-  ##-- print final newline
-  $fh->print("\n");
-
-  return $diff;
+## $mergedStr = $diff->sharedString($tok1str,$tok2str)
+sub sharedString {
+  my ($diff,$str1,$str2) = @_;
+  my @w1 = defined($str1) ? split(/[\t\n\r]/,$str1) : qw();
+  my @w2 = defined($str2) ? split(/[\t\n\r]/,$str2) : qw();
+  my @w12 = map {
+    (defined($w1[$_])
+     ? (defined($w2[$_])
+	? ($w1[$_] eq $w2[$_]
+	   ? "=$w1[$_]"
+	   : "<$w1[$_]\t>$w2[$_]")
+	: "<$w1[$_]")
+     : (defined($w2[$_])
+	? ">$w2[$_]"
+	: ''))
+  } (0..($#w1 > $#w2 ? $#w1 : $#w2));
+  return "\t".join("\t", @w12)."\n";
 }
 
 ##----------------------------------------------------------------------
@@ -329,42 +352,60 @@ sub dumpContextDiff {
 ##  + stores text representation of $diff to $filename_or_fh
 ##  + %opts:
 ##     header => $bool, ##-- store header? (default=1)
+##     files  => $bool, ##-- store filenames (defualt=1)
+##     shared => $bool, ##-- store shared lines (default=1)
 sub saveTextFile {
   my ($diff,$file,%opts) = @_;
   my $fh = ref($file) ? $file : IO::File->new(">$file");
   confess(ref($diff)."::saveTextFile(): open failed for '$file': $!") if (!defined($fh));
+  binmode($fh,':utf8');
+
+  ##-- options
+  %opts = (header=>1,files=>1,shared=>1,%opts);
 
   ##-- dump: header
-  $opts{header} = 1 if (!defined($opts{header}));
-  $fh->print("=== file1: $diff->{file1}\n",
-	     "=== file2: $diff->{file2}\n",
-	     (map {"=== $_: ".($diff->{$_} ? 1 : 0)."\n"} qw(cmpEOS cmpComments cmpEmpty)),
-	     "=== ss1: ", join(' ', @{$diff->{ss1}}), "\n",
-	     "=== ss2: ", join(' ', @{$diff->{ss2}}), "\n",
-	     "=== sw1: ", join(' ', @{$diff->{sw1}}), "\n",
-	     "=== sw2: ", join(' ', @{$diff->{sw2}}), "\n",
+  $fh->print("%% -*- Mode: Diff; encoding: utf-8 -*-\n",
+	     (("%" x 80), "\n"),
+	     "%% File auto-generated by ", ref($diff), "\n",
+	     "%% File Format:\n",
+	     "%%  \% COMMENT                 : comment\n",
+	     "%%  \$ NAME: VALUE             : ".ref($diff)." object data field\n",
+	     "%%  \@ OP MIN1,MAX1 MIN2,MAX2  : diff hunk address (0-based)\n",
+	     "%%  <\\tLINE1                  : (\"deleted\")  line from file1 missing in file2\n",
+	     "%%  >\\tLINE1                  : (\"inserted\") line from file2 missing in file1\n",
+	     "%%  \\tLINE                    : (\"shared\")   line in both file1 and file2\n",
+	     (("%" x 80), "\n"),
 	    ) if ($opts{header});
 
-  ##-- dump: hunks (traditional diff format)
-  $fh->print("--- HUNKS (".scalar(@{$diff->{hunks}}).")\n");
-  my ($seq1,$seq2,$doc1,$doc2,$ss1,$ss2,$sw1,$sw2) = @$diff{qw(seq1 seq2 doc1 doc2 ss1 ss2 sw1 sw2)};
-  my ($hunk, $bits,$min1,$max1,$min2,$max2, $addr,$sep);
+  $fh->print("\$ file1: $diff->{file1}\n",
+	     "\$ file2: $diff->{file2}\n",
+	    ) if ($opts{files});
+
+  ##-- dump: sequences + hunks
+  my ($i1,$i2) = (0,0);
+  my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
+  my ($hunk, $op,$min1,$max1,$min2,$max2, $addr);
+  my $sep12 = "\t\$--\$\t";
   foreach $hunk (@{$diff->{hunks}}) {
-    ($bits,$min1,$max1,$min2,$max2) = @$hunk;
-    next if (!$bits);
-    if    ($bits == 1) { $addr = "${min1},${max1}d${min2}"; $sep=''; }
-    elsif ($bits == 2) { $addr = "${min1}a,${min2},${max2}"; $sep=''; }
-    else               { $addr = "${min1},${max1}c${min2},${max2}"; $sep="---\n"; }
+    ($op,$min1,$max1,$min2,$max2) = @$hunk;
+
+    ##-- dump preceding context
+    $fh->print(map { $diff->sharedString($seq1->[$i1+$_], $seq2->[$i2+$_]) } (0..($min1-$i1-1)))
+      if ($opts{shared});
+
+    ##-- dump hunk
+    $addr = "\@ $op $min1,$max1 $min2,$max2";
     $fh->print($addr, "\n",
-	       #(map {"< $_\n"} @$seq1[$min1..$max1]),
-	       #$sep,
-	       #(map {"> $_\n"} @$seq2[$min2..$max2]),
-	       ##--
-	       (map {"< ".$doc1->[$ss1->[$_]][$sw1->[$_]]->toString."\n"} ($min1..$max1)),
-	       $sep,
-	       (map {"> ".$doc2->[$ss2->[$_]][$sw2->[$_]]->toString."\n"} ($min2..$max2)),
+	       (map {"<\t$_\n"} @$seq1[($min1+0)..($max1+0)]),
+	       (map {">\t$_\n"} @$seq2[($min2+0)..($max2+0)]),
 	      );
+
+    ##-- update current position counters
+    ($i1,$i2) = ($max1+1,$max2+1);
   }
+  ##-- dump trailing context
+  $fh->print(map { $diff->sharedString($seq1->[$i1+$_], $seq2->[$i2+$_]) } (0..($#$seq1-$i1-1)))
+    if ($opts{shared});
   $fh->close() if (!ref($file));
   return $diff;
 }
@@ -376,65 +417,46 @@ sub loadTextFile {
   $diff = $diff->new if (!ref($diff));
   my $fh = ref($file) ? $file : IO::File->new("<$file");
   confess(ref($diff)."::loadTextFile(): open failed for '$file': $!") if (!defined($fh));
+  binmode($fh,':utf8');
 
   ##-- load
-  my %op2bits = (a=>2,c=>3,d=>1);
-  my $hunks = $diff->{hunks} = [];
-  my ($line, $bits,$min1,$max1,$min2,$max2);
+  @{$diff->{hunks}} = qw();
+  @{$diff->{seq1}}  = qw();
+  @{$diff->{seq2}}  = qw();
+  my ($hunks,$seq1,$seq2) = @$diff{qw(hunks seq1 seq2)};
+  my ($line, $op,$min1,$max1,$min2,$max2);
+  my (@w1,@w2);
   while (defined($line=<$fh>)) {
-    #chomp($line);
-    if      ($line =~ /^\=\=\= (s[sw][12]): (.*)$/) {
-      $diff->{$1} = [split(/\s+/,$2)];
-    }
-    elsif ($line =~ /^\=\=\= (\w+): (.*)$/) {
+    chomp($line);
+    if    ($line =~ /^\%/) { ; }    ##-- comment
+    elsif ($line =~ /^\$\s+(\w+):\s+(.*)$/) { ##-- object data field
       $diff->{$1} = $2;
     }
-    elsif ($line =~ /^(\d+)(?:\,(\d+))?([acd])(\d+)(?:\,(\d+))?$/) {
-      $bits = $op2bits{$3};
-      ($min1,$max1,$min2,$max2) = ($1,$2,$4,$5);
-      $max1 = $min1 if (!defined($max1));
-      $max2 = $min2 if (!defined($max2));
-      push(@$hunks, [$bits, $min1,$max1,$min2,$max2]);
+    elsif ($line =~ /^\@ ([acd]) (\-?\d+),(\-?\d+) (\-?\d+),(\-?\d+)$/) { ##-- hunk address
+      push(@$hunks, [$1, map {$_+0} ($2,$3,$4,$5)]);
     }
-    ##-- ignore others
+    elsif ($line =~ /^\t/) { ##-- shared sequence item
+      @w1 = @w2 = qw();
+      while ($line =~ /[\t\n\r]([\=\<\>])([^\t\n\r]*)/g) {
+	push(@w1, $2) if ($1 ne '>');
+	push(@w2, $2) if ($1 ne '<');
+      }
+      push(@$seq1, join("\t",@w1));
+      push(@$seq2, join("\t",@w2));
+    }
+    elsif ($line =~ /^\<\t(.*)$/) { ##-- seq1-only item
+      push(@$seq1,$1);
+    }
+    elsif ($line =~ /^\>\t(.*)$/) { ##-- seq2-only item
+      push(@$seq2,$1);
+    }
+    else {
+      warn(ref($diff)."::loadTextFile($file): parse error at line ", $fh->input_line_number, ", ignoring: '$line'");
+    }
   }
   $fh->close() if (!ref($file));
 
   return $diff;
-}
-
-##----------------------------------------------------------------------
-## Methods: I/O: Binary
-
-## $diff = $diff->saveBinFile($filename_or_fh)
-sub saveBinFile {
-  require Storable;
-  my ($diff,$file) = @_;
-  my ($rc);
-  if (ref($file)) {
-    $rc = Storable::store_fd($diff,$file);
-  } else {
-    $rc = Storable::store($diff,$file);
-  }
-  return $rc ? $diff : undef;
-}
-
-
-## $diff = $CLASS_OR_OBJ->loadBinFile($filename_or_fh)
-sub loadBinFile {
-  require Storable;
-  my ($diff,$file) = @_;
-  my ($ref,$rc);
-  if (ref($file)) {
-    $ref = Storable::retrieve_fd($file);
-  } else {
-    $ref = Storable::retrieve($file);
-  }
-  if (ref($diff)) {
-    %$diff = %$ref;
-    return $diff;
-  }
-  return $ref;
 }
 
 
