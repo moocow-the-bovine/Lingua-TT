@@ -47,65 +47,51 @@ if ($version || $verbose >= 2) {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-our $diff = Lingua::TT::Diff->new(%diffargs);
-
 push(@ARGV,'-') if (!@ARGV);
-our $outfh = IO::File->new(">$outfile")
-  or die("$0: open failed for output file '$outfile': $!");
 
-foreach $dfile (@ARGV) {
-  our $dfile = shift(@ARGV);
-  $diff->reset;
-  $diff->loadTextFile($dfile)
-    or die("$0: load failed for '$dfile': $!");
+our $diff = Lingua::TT::Diff->new(%diffargs);
+our $dfile = shift(@ARGV);
+$diff->loadTextFile($dfile)
+  or die("$0: load failed from '$dfile': $!");
 
-  ##-- vars
-  my ($file1,$file2,$seq1,$seq2,$hunks) = @$diff{qw(file1 file2 seq1 seq2 hunks)};
+##--------------------------------------------------------------
+## MAIN: Heuristics: Simple
+my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
+my ($op,$min1,$max1,$min2,$max2);
+my (@items1,@items2);
+foreach $hunk (@$hunks) {
+  next if (defined($hunk->[5])); ##-- already resolved
+  ($op,$min1,$max1,$min2,$max2) = @$hunk;
+  @items1 = @$seq1[$min1..$max1];
+  @items2 = @$seq2[$min2..$max2];
 
-  ##-- counts
-  my $nseq1  = scalar(@$seq1);
-  my $nseq2  = scalar(@$seq2);
-  my $nhunks = scalar(@$hunks);
-  my $ndel   = scalar(grep {$_->[0] eq 'd'} @$hunks);
-  my $nins   = scalar(grep {$_->[0] eq 'a'} @$hunks);
-  my $nchg   = scalar(grep {$_->[0] eq 'c'} @$hunks);
-  ##
-  my $nres   = scalar(grep {defined($_->[5])} @$hunks);
-
-  ##-- formatting stuff
-  my $llen  = 14;
-  my $ilen1 = length($nseq1);
-  my $ilen2 = length($nseq2);
-  my $flen  = 5;
-  my $npad  = 5;
-  ##
-  my $clen1 = length($file1) > ($ilen1+$flen+$npad) ? length($file1) : ($ilen1+$flen+$npad);
-  my $clen2 = length($file2) > ($ilen2+$flen+$npad) ? length($file2) : ($ilen2+$flen+$npad);
-  ##
-  my $lfmt  = '%'.(-$llen).'s';
-  my $sfmt1 = "%${clen1}s";
-  my $sfmt2 = "%${clen2}s";
-  my $ifmt1 = '%'.($clen1-$flen-$npad).'d';
-  my $ifmt2 = '%'.($clen2-$flen-$npad).'d';
-  my $ifmt1a = $ifmt1.(' ' x ($flen+$npad));
-  my $ifmt2a = $ifmt2.(' ' x ($flen+$npad));
-  my $ffmt  = "(%${flen}.1f %%)";
-  my $iffmt  = $ifmt1.' '.$ffmt.' | '.$ifmt2.' '.$ffmt;
-  my $iffmt1 = $ifmt1.' '.$ffmt.' | '.(' ' x $clen2);
-  my $iffmt2 = (' ' x $clen1)  .' | '.$ifmt2.' '.$ffmt;
-
-  ##-- report
-  $outfh->print(#"DIFF: $dfile\n",
-		sprintf("$lfmt: %s\n", 'Diff', $dfile),
-		sprintf("$lfmt: $sfmt1 | $sfmt2\n", ' + Files', $file1, $file2),
-		sprintf("$lfmt: $iffmt\n",  ' + Items', $nseq1, 100, $nseq2, 100),
-		sprintf("$lfmt: $iffmt\n",  ' + Hunks', $nhunks, 100*$nhunks/$nseq1, $nhunks, 100*$nhunks/$nseq2),
-		sprintf("$lfmt: $iffmt1\n", '   - DELETE', $ndel, 100*$ndel/$nseq1),
-		sprintf("$lfmt: $iffmt2\n", '   - INSERT', $nins, 100*$nins/$nseq2),
-		sprintf("$lfmt: $iffmt\n",  '   - CHANGE', $nchg, 100*$nchg/$nseq1, $nchg, 100*$nchg/$nseq2),
-		sprintf("$lfmt: $iffmt\n",  ' + Resolved', $nres, 100*$nres/$nhunks, $nres, 100*$nres/$nhunks),
-	       );
+  ##-- DELETE: $1 ~ cmt|eos|punct -> $1
+  if ($op eq 'd' && @items1==grep {/^\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
+    {
+      $hunk->[5] = 1;
+    }
+  ##-- CHANGE: $1 ~ cmt|eos|punct & $2 ~ punct|eos -> $1
+  elsif ($op eq 'c'
+	 && @items1==(grep {/^\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
+	 && @items2==(grep {/^$/ || /^[[:punct:]](?:\t|$)/} @items2))
+    {
+      $hunk->[5] = 1;
+    }
+  ##-- CHANGE: $1 ~ /CARD+/ & $2 ~ /CARD/ -> $2
+  elsif ($op eq 'c'
+	 && @items1==(grep {/^\d+\tCARD$/} @items1)
+	 && @items2==(grep {/[\d_]+(\t.*)?\tCARD(?:\t|$)/} @items2))
+    {
+      $hunk->[5] = 2;
+    }
 }
+
+
+##--------------------------------------------------------------
+## MAIN: save
+$diff->saveTextFile($outfile)
+  or die("$0: save failed to '$outfile': $!");
+
 
 __END__
 
@@ -121,7 +107,7 @@ tt-diff-info.perl - get basic info from tt-diff files
 
 =head1 SYNOPSIS
 
- tt-diff-info.perl OPTIONS [TT_DIFF_FILE(s)]
+ tt-diff-info.perl OPTIONS [TTFILE(s)]
 
  General Options:
    -help
