@@ -228,6 +228,18 @@ sub putDocument {
   $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString)); #, "\n"
 }
 
+## $io = $io->putLines(@lines);
+## $io = $io->putLines(\@lines);
+##  + dumps @lines to output handle, adding terminating newline
+sub putLines {
+  my $io = shift;
+  my $lines = @_==1 && ref($_[0]) ? $_[0] : [@_];
+  my $buf = join("\n",@$lines)."\n";
+  $buf = encode($io->{encoding},$buf);
+  $io->{fh}->print($buf);
+  return $io;
+}
+
 
 ##==============================================================================
 ## Footer

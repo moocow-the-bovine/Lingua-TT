@@ -41,12 +41,12 @@ our $DIFF = 'diff'; ##-- search in path
 ##   ##
 ##   ##-- diff data
 ##   hunks => \@hunks,    ##-- difference hunks: [$hunk1,$hunk2,...]
-##                        ## + each $hunk is: [$opCode, $min1,$max1, $min2,$max2, $resolve]
+##                        ## + each $hunk is: [$opCode, $min1,$max1, $min2,$max2, $fix]
 ##                        ## + $opCode is as for traditional 'diff':
 ##                        ##    'a' (add)   : Add     @$seq2[$min2..$max2], align after ($min1==$max1) of $seq1
 ##                        ##    'd' (delete): Delete  @$seq1[$min1..$max1], align after ($min2==$max2) of $seq2
 ##                        ##    'c' (change): Replace @$seq1[$min1..$max1] with @$seq2[$min2..$max2]
-##                        ## + $resolve is one of:
+##                        ## + $fix is one of:
 ##                        ##    $which  : int (1 or 2): use corresponding item(s) of "seq${which}"
 ##                        ##    \@items : ARRAY-ref: resolve conflict with \@items
 sub new {
@@ -324,6 +324,52 @@ sub seqTempFile {
 }
 
 ##==============================================================================
+## Methods: Application / Resolution
+
+## \@seq = $diff->apply(%opts)
+##  + get "fixed" sequence from fully populated diff
+##  + %opts:
+##     prefer => $which,      ##-- prefer/project which sequence (1 or 2); default=1
+##     fix => $bool,          ##-- allow fixes to override preference? default=true
+sub apply {
+  my ($diff,%opts) = @_;
+
+  ##-- defaults
+  %opts = (prefer=>1,fix=>1,%opts);
+  my $pref = $opts{prefer};
+  my $pfix = $opts{fix};
+
+  ##-- output sequence
+  my $seq3 = [];
+
+  ##-- loop: vars
+  my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
+  my ($hunk, $op,$min1,$max1,$min2,$max2, $fix);
+  my ($i1,$i2) = (0,0);
+  foreach $hunk (@{$diff->{hunks}}) {
+    ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
+
+    ##-- dump preceding context
+    push(@$seq3, $pref==1 ? @$seq1[$i1..($min1-1)] : @$seq2[$i2..($min2-1)]);
+
+    ##-- resolve conflict
+    if ($pfix && defined($fix)) {
+      push(@$seq3, (ref($fix) ? @$fix : ($fix==1 ? @$seq1[$min1..$max1] : @$seq2[$min2..$max2])));
+    } else {
+      push(@$seq3, $pref==1 ? @$seq1[$min1..$max1] : @$seq2[$min2..$max2]);
+    }
+
+    ##-- update current position counters
+    ($i1,$i2) = ($max1+1,$max2+1);
+  }
+
+  ##-- dump trailing context
+  push(@$seq3, $pref==1 ? @$seq1[$i1..($min1-1)] : @$seq2[$i2..($min2-1)]);
+
+  return wantarray ? @$seq3 : $seq3;
+}
+
+##==============================================================================
 ## Methods: I/O
 
 ##----------------------------------------------------------------------
@@ -345,7 +391,7 @@ sub sharedString {
 	? ">$w2[$_]"
 	: ''))
   } (0..($#w1 > $#w2 ? $#w1 : $#w2));
-  return "\t".join("\t", @w12)."\n";
+  return '~ '.join("\t", @w12)."\n";
 }
 
 ##----------------------------------------------------------------------
@@ -387,10 +433,9 @@ sub saveTextFile {
   ##-- dump: sequences + hunks
   my ($i1,$i2) = (0,0);
   my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
-  my ($hunk, $op,$min1,$max1,$min2,$max2,$res, $addr);
-  my $sep12 = "\t\$--\$\t";
+  my ($hunk, $op,$min1,$max1,$min2,$max2,$fix, $addr);
   foreach $hunk (@{$diff->{hunks}}) {
-    ($op,$min1,$max1,$min2,$max2,$res) = @$hunk;
+    ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
 
     ##-- dump preceding context
     $fh->print(map { $diff->sharedString($seq1->[$i1+$_], $seq2->[$i2+$_]) } (0..($min1-$i1-1)))
@@ -398,11 +443,11 @@ sub saveTextFile {
 
     ##-- dump hunk
     $addr = "\@ $op $min1,$max1 $min2,$max2";
-    $addr .= (defined($res) ? (ref($res) ? ' :@' : " :$res") : '');
+    $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : '');
     $fh->print($addr, "\n",
-	       (map {"<\t$_\n"} @$seq1[($min1+0)..($max1+0)]),
-	       (map {">\t$_\n"} @$seq2[($min2+0)..($max2+0)]),
-	       (ref($res) ? (map {":\t$_\n"} @$res) : qw()),
+	       (map {"< $_\n"} @$seq1[($min1+0)..($max1+0)]),
+	       (map {"> $_\n"} @$seq2[($min2+0)..($max2+0)]),
+	       (ref($fix) ? (map {"= $_\n"} @$fix) : qw()),
 	      );
 
     ##-- update current position counters
@@ -440,23 +485,24 @@ sub loadTextFile {
     elsif ($line =~ /^\@ ([acd]) (\-?\d+),(\-?\d+) (\-?\d+),(\-?\d+)(?: \: ?([\d\@]+))?$/) { ##-- hunk address
       push(@$hunks, $hunk=[$1, map {$_+0} ($2,$3,$4,$5,(defined($6) ? $6 : qw()))]);
     }
-    elsif ($line =~ /^\t/) { ##-- shared sequence item
+    elsif ($line =~ /^~ /) { ##-- shared sequence item
       @w1 = @w2 = qw();
-      while ($line =~ /[\t\n\r]([\=\<\>])([^\t\n\r]*)/g) {
+      substr($line,0,2,'');
+      while ($line =~ /([\=\<\>])([^\t\n\r]*)/g) {
 	push(@w1, $2) if ($1 ne '>');
 	push(@w2, $2) if ($1 ne '<');
       }
       push(@$seq1, join("\t",@w1));
       push(@$seq2, join("\t",@w2));
     }
-    elsif ($line =~ /^\<\t(.*)$/) { ##-- seq1-only item
+    elsif ($line =~ /^\< (.*)$/) { ##-- seq1-only item
       push(@$seq1,$1);
     }
-    elsif ($line =~ /^\>\t(.*)$/) { ##-- seq2-only item
+    elsif ($line =~ /^\> (.*)$/) { ##-- seq2-only item
       push(@$seq2,$1);
     }
-    elsif ($line =~ /^\:\t(.*)$/) { ##-- resolution item
-      warn(ref($diff)."::loadTextFile($file): ignoring resolution without current hunk: '$line'") if (!$hunk);
+    elsif ($line =~ /^\= (.*)$/) { ##-- fix item
+      warn(ref($diff)."::loadTextFile($file): ignoring fix without current hunk: '$line'") if (!$hunk);
       $hunk->[5] = [] if (!ref($hunk->[5]));
       push(@{$hunk->[5]}, $1);
     }

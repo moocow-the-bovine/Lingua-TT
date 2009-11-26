@@ -45,6 +45,14 @@ if ($version || $verbose >= 2) {
 }
 
 ##----------------------------------------------------------------------
+## subs
+
+sub pct {
+  my ($num,$denom) = @_;
+  return !defined($denom) || $denom==0 ? 'nan' : 100*$num/$denom;
+}
+
+##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 our $diff = Lingua::TT::Diff->new(%diffargs);
@@ -70,7 +78,8 @@ foreach $dfile (@ARGV) {
   my $nins   = scalar(grep {$_->[0] eq 'a'} @$hunks);
   my $nchg   = scalar(grep {$_->[0] eq 'c'} @$hunks);
   ##
-  my $nres   = scalar(grep {defined($_->[5])} @$hunks);
+  my $nfix   = scalar(grep {defined($_->[5])} @$hunks);
+  my $nnofix = $nhunks-$nfix;
 
   ##-- formatting stuff
   my $llen  = 14;
@@ -99,11 +108,12 @@ foreach $dfile (@ARGV) {
 		sprintf("$lfmt: %s\n", 'Diff', $dfile),
 		sprintf("$lfmt: $sfmt1 | $sfmt2\n", ' + Files', $file1, $file2),
 		sprintf("$lfmt: $iffmt\n",  ' + Items', $nseq1, 100, $nseq2, 100),
-		sprintf("$lfmt: $iffmt\n",  ' + Hunks', $nhunks, 100*$nhunks/$nseq1, $nhunks, 100*$nhunks/$nseq2),
-		sprintf("$lfmt: $iffmt1\n", '   - DELETE', $ndel, 100*$ndel/$nseq1),
-		sprintf("$lfmt: $iffmt2\n", '   - INSERT', $nins, 100*$nins/$nseq2),
-		sprintf("$lfmt: $iffmt\n",  '   - CHANGE', $nchg, 100*$nchg/$nseq1, $nchg, 100*$nchg/$nseq2),
-		sprintf("$lfmt: $iffmt\n",  ' + Resolved', $nres, 100*$nres/$nhunks, $nres, 100*$nres/$nhunks),
+		sprintf("$lfmt: $iffmt\n",  ' + Hunks', $nhunks, pct($nhunks,$nseq1), $nhunks, pct($nhunks,$nseq2)),
+		sprintf("$lfmt: $iffmt1\n", '   - DELETE', $ndel, pct($ndel,$nseq1)),
+		sprintf("$lfmt: $iffmt2\n", '   - INSERT', $nins, pct($nins,$nseq2)),
+		sprintf("$lfmt: $iffmt\n",  '   - CHANGE', $nchg, pct($nchg,$nseq1), $nchg, pct($nchg,$nseq2)),
+		sprintf("$lfmt: $iffmt\n",  ' + Fixed', $nfix, pct($nfix,$nhunks), $nfix, pct($nfix,$nhunks)),
+		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix, pct($nnofix,$nhunks), $nnofix, pct($nnofix,$nhunks)),
 	       );
 }
 

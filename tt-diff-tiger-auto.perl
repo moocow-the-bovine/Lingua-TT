@@ -57,22 +57,42 @@ $diff->loadTextFile($dfile)
 ##--------------------------------------------------------------
 ## MAIN: Heuristics: Simple
 my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
-my ($op,$min1,$max1,$min2,$max2);
+my ($op,$min1,$max1,$min2,$max2,$fix);
 my (@items1,@items2);
-foreach $hunk (@$hunks) {
-  next if (defined($hunk->[5])); ##-- already resolved
-  ($op,$min1,$max1,$min2,$max2) = @$hunk;
+foreach $hunki (0..$#$hunks) {
+  $hunk = $hunks->[$hunki];
+  ($op,$min1,$max1,$min2,$max2, $fix) = @$hunk;
+  next if (defined($fix)); ##-- already resolved
   @items1 = @$seq1[$min1..$max1];
   @items2 = @$seq2[$min2..$max2];
 
   ##-- DELETE: $1 ~ cmt|eos|punct -> $1
-  if ($op eq 'd' && @items1==grep {/^\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
+  if ($op eq 'd' && @items1==grep {/^\%\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
+    {
+      $hunk->[5] = 1;
+      ##-- check for subsequent related hunk: <'' ~EOS  <CMT >''
+      if ($hunki < $#$hunks && $max1 < $#$seq1) {
+	$hunk2 = $hunks->[$hunki+1];
+	if ($seq1->[$max1+1] =~ /^$/
+	    && $hunk2->[0] eq 'c'
+	    && $hunk2->[1] == ($max1+2)
+	    && ($hunk2->[2]-$hunk2->[1]+1) == 1
+	    && ($hunk2->[4]-$hunk2->[3]+1) == 1
+	    && $seq1->[$hunk2->[1]] =~ /^\%\%/
+	    && $seq2->[$hunk2->[3]] =~ /^[[:punct:]]+\t/)
+	  {
+	    $hunk2->[5] = 1;
+	  }
+      }
+    }
+  ##-- INSERT: $2 ~ cmt|eos -> $1
+  elsif ($op eq 'a' && @items2==(grep {/^$/ || /^$/} @items2))
     {
       $hunk->[5] = 1;
     }
   ##-- CHANGE: $1 ~ cmt|eos|punct & $2 ~ punct|eos -> $1
   elsif ($op eq 'c'
-	 && @items1==(grep {/^\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
+	 && @items1==(grep {/^\%\%/ || /^$/ || /^[[:punct:]]+\t/} @items1)
 	 && @items2==(grep {/^$/ || /^[[:punct:]](?:\t|$)/} @items2))
     {
       $hunk->[5] = 1;
@@ -80,7 +100,8 @@ foreach $hunk (@$hunks) {
   ##-- CHANGE: $1 ~ /CARD+/ & $2 ~ /CARD/ -> $2
   elsif ($op eq 'c'
 	 && @items1==(grep {/^\d+\tCARD$/} @items1)
-	 && @items2==(grep {/[\d_]+(\t.*)?\tCARD(?:\t|$)/} @items2))
+	 && @items2==1
+	 && $items2[0] =~ /^\d[\d\_]+(?:\t.*)?\tCARD(?:\t|$)/)
     {
       $hunk->[5] = 2;
     }
