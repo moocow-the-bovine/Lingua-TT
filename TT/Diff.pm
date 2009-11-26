@@ -41,11 +41,14 @@ our $DIFF = 'diff'; ##-- search in path
 ##   ##
 ##   ##-- diff data
 ##   hunks => \@hunks,    ##-- difference hunks: [$hunk1,$hunk2,...]
-##                        ## + each $hunk is: [$opCode, $min1,$max1, $min2,$max2]
+##                        ## + each $hunk is: [$opCode, $min1,$max1, $min2,$max2, $resolution]
 ##                        ## + $opCode is as for traditional 'diff':
-##                        ##   'a' (add)   : Add     @$seq2[$min2..$max2], align after ($min1==$max1) of $seq1
-##                        ##   'd' (delete): Delete  @$seq1[$min1..$max1], align after ($min2==$max2) of $seq2
-##                        ##   'c' (change): Replace @$seq1[$min1..$max1] with @$seq2[$min2..$max2]
+##                        ##    'a' (add)   : Add     @$seq2[$min2..$max2], align after ($min1==$max1) of $seq1
+##                        ##    'd' (delete): Delete  @$seq1[$min1..$max1], align after ($min2==$max2) of $seq2
+##                        ##    'c' (change): Replace @$seq1[$min1..$max1] with @$seq2[$min2..$max2]
+##                        ## + $resolution is one of:
+##                        ##    $which  : int (1 or 2): use corresponding item(s) of "seq${which}"
+##                        ##    \@items : ARRAY-ref: resolve conflict with \@items
 sub new {
   my $that = shift;
   my $diff = bless({
