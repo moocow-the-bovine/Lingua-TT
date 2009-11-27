@@ -71,15 +71,23 @@ foreach $dfile (@ARGV) {
   my ($file1,$file2,$seq1,$seq2,$hunks) = @$diff{qw(file1 file2 seq1 seq2 hunks)};
 
   ##-- counts
-  my $nseq1  = scalar(@$seq1);
-  my $nseq2  = scalar(@$seq2);
-  my $nhunks = scalar(@$hunks);
-  my $ndel   = scalar(grep {$_->[0] eq 'd'} @$hunks);
-  my $nins   = scalar(grep {$_->[0] eq 'a'} @$hunks);
-  my $nchg   = scalar(grep {$_->[0] eq 'c'} @$hunks);
+  my $nseq1   = scalar(@$seq1);
+  my $nseq2   = scalar(@$seq2);
+  my $nhunks  = scalar(@$hunks);
   ##
-  my $nfix   = scalar(grep {defined($_->[5])} @$hunks);
-  my $nnofix = $nhunks-$nfix;
+  my $ndel=0;  $ndel+=($_->[2]-$_->[1]+1) foreach (grep {$_->[0] eq 'd'} @$hunks);
+  my $nins=0;  $nins+=($_->[4]-$_->[3]+1) foreach (grep {$_->[0] eq 'a'} @$hunks);
+  my $nchg1=0; $nchg1+=($_->[2]-$_->[1]+1) foreach (grep {$_->[0] eq 'c'} @$hunks);
+  my $nchg2=0; $nchg2+=($_->[4]-$_->[3]+1) foreach (grep {$_->[0] eq 'c'} @$hunks);
+  my $nbad1 = $ndel+$nchg1;
+  my $nbad2 = $nins+$nchg2;
+  my $nok1 = $nseq1-$nbad1;
+  my $nok2 = $nseq2-$nbad2;
+  ##
+  my $nfix1=0; $nfix1+=($_->[2]-$_->[1]+1) foreach (grep {$_->[5] && $_->[0] ne 'a'} @$hunks);
+  my $nfix2=0; $nfix2+=($_->[4]-$_->[3]+1) foreach (grep {$_->[5] && $_->[0] ne 'd'} @$hunks);
+  my $nnofix1 = $nbad1-$nfix1;
+  my $nnofix2 = $nbad2-$nfix2;
 
   ##-- formatting stuff
   my $llen  = 14;
@@ -94,26 +102,29 @@ foreach $dfile (@ARGV) {
   my $lfmt  = '%'.(-$llen).'s';
   my $sfmt1 = "%${clen1}s";
   my $sfmt2 = "%${clen2}s";
-  my $ifmt1 = '%'.($clen1-$flen-$npad).'d';
-  my $ifmt2 = '%'.($clen2-$flen-$npad).'d';
+  $ilen1    = ($clen1-$flen-$npad);
+  $ilen2    = ($clen2-$flen-$npad);
+  my $ifmt1 = "%${ilen1}d";
+  my $ifmt2 = "%${ilen2}d";
   my $ifmt1a = $ifmt1.(' ' x ($flen+$npad));
   my $ifmt2a = $ifmt2.(' ' x ($flen+$npad));
   my $ffmt  = "(%${flen}.1f %%)";
   my $iffmt  = $ifmt1.' '.$ffmt.' | '.$ifmt2.' '.$ffmt;
-  my $iffmt1 = $ifmt1.' '.$ffmt.' | '.(' ' x $clen2);
-  my $iffmt2 = (' ' x $clen1)  .' | '.$ifmt2.' '.$ffmt;
+  my $iffmt1 = $ifmt1.' '.$ffmt.' | '.sprintf("%${ilen2}s  %${flen}s   ",'-','-');
+  my $iffmt2 = sprintf("%${ilen1}s  %${flen}s   ",'-','-').' | '.$ifmt2.' '.$ffmt;
 
   ##-- report
   $outfh->print(#"DIFF: $dfile\n",
 		sprintf("$lfmt: %s\n", 'Diff', $dfile),
 		sprintf("$lfmt: $sfmt1 | $sfmt2\n", ' + Files', $file1, $file2),
 		sprintf("$lfmt: $iffmt\n",  ' + Items', $nseq1, 100, $nseq2, 100),
-		sprintf("$lfmt: $iffmt\n",  ' + Hunks', $nhunks, pct($nhunks,$nseq1), $nhunks, pct($nhunks,$nseq2)),
-		sprintf("$lfmt: $iffmt1\n", '   - DELETE', $ndel, pct($ndel,$nseq1)),
-		sprintf("$lfmt: $iffmt2\n", '   - INSERT', $nins, pct($nins,$nseq2)),
-		sprintf("$lfmt: $iffmt\n",  '   - CHANGE', $nchg, pct($nchg,$nseq1), $nchg, pct($nchg,$nseq2)),
-		sprintf("$lfmt: $iffmt\n",  ' + Fixed', $nfix, pct($nfix,$nhunks), $nfix, pct($nfix,$nhunks)),
-		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix, pct($nnofix,$nhunks), $nnofix, pct($nnofix,$nhunks)),
+		sprintf("$lfmt: $iffmt\n",  '   - MATCH',  $nok1, pct($nok1,$nseq1), $nok2, pct($nok2,$nseq2)),
+		sprintf("$lfmt: $iffmt\n",  '   - NOMATCH', $nbad1, pct($nbad1,$nseq1), $nbad2, pct($nbad2,$nseq2)),
+		sprintf("$lfmt: $iffmt1\n", '     ~ DELETE', $ndel, pct($ndel,$nseq1)),
+		sprintf("$lfmt: $iffmt2\n", '     ~ INSERT', $nins, pct($nins,$nseq2)),
+		sprintf("$lfmt: $iffmt\n",  '     ~ CHANGE', $nchg1, pct($nchg1,$nseq1), $nchg2, pct($nchg2,$nseq2)),
+		sprintf("$lfmt: $iffmt\n",  ' + Fixed', $nfix1, pct($nfix1,$nbad1), $nfix2, pct($nfix2,$nbad2)),
+		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix1, pct($nnofix1,$nbad2), $nnofix2, pct($nnofix2,$nbad2)),
 	       );
 }
 

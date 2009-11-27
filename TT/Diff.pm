@@ -359,8 +359,11 @@ sub apply {
       push(@$seq3, $pref==1 ? @$seq1[$min1..$max1] : @$seq2[$min2..$max2]);
     }
 
-    ##-- update current position counters
-    ($i1,$i2) = ($max1+1,$max2+1);
+    ##-- update current position counters (with safety checks for hacked diffs)
+    $max1 = $min1 if ($min1>$max1);
+    $max2 = $min2 if ($min2>$max2);
+    $i1 = $max1+1 if ($max1 >= $i1);
+    $i2 = $max2+1 if ($max2 >= $i2);
   }
 
   ##-- dump trailing context
@@ -444,7 +447,7 @@ sub saveTextFile {
 
     ##-- dump hunk
     $addr = "\@ $op $min1,$max1 $min2,$max2";
-    $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : '');
+    $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : ' :0');
     $fh->print($addr, "\n",
 	       (map {"< $_\n"} @$seq1[($min1+0)..($max1+0)]),
 	       (map {"> $_\n"} @$seq2[($min2+0)..($max2+0)]),
@@ -483,8 +486,8 @@ sub loadTextFile {
     elsif ($line =~ /^\$\s+(\w+):\s+(.*)$/) { ##-- object data field
       $diff->{$1} = $2;
     }
-    elsif ($line =~ /^\@ ([acd]) (\-?\d+),(\-?\d+) (\-?\d+),(\-?\d+)(?: \: ?([\d\@]+))?$/) { ##-- hunk address
-      push(@$hunks, $hunk=[$1, map {$_+0} ($2,$3,$4,$5,(defined($6) ? $6 : qw()))]);
+    elsif ($line =~ /^\@ ([acd]) (\-?\d+),(\-?\d+) (\-?\d+),(\-?\d+)(?: \: ?([\d\@\?]+))?$/) { ##-- hunk address
+      push(@$hunks, $hunk=[$1, (map {$_+0} ($2,$3,$4,$5)), (defined($6) && $6 ne '?' ? $6 : qw())]);
     }
     elsif ($line =~ /^~ /) { ##-- shared sequence item
       @w1 = @w2 = qw();

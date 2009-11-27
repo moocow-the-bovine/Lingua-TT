@@ -1,0 +1,98 @@
+ -*- Mode: Text; encoding: utf-8 -*-
+
+##------------------------------------------------------------------------
+## TODO
+
+MWE (undesirables)
+  - am/APPRART Rande/NN -- am_Rande/-(:ADV)
+  - mit/APPR Hilfe/NN -- mit_Hilfe/-(:ADV)
+  - Hin/NN und/KON Her/NN -- Hin_und_Her/-(:NN)
+  - auf/APPR jeden/PIAT Fall/NN -- auf_jeden_Fall/-(:ADV)
+
+##------------------------------------------------------------------------
+## DONE
+
+MWE [NE NN] --> (text($2) "=NE")
+  - Barmer/NE Ersatzkasse/NN -- Barmer_Erstatzkasse/-(:NE)
+
+MWE [NN ART NN] --> (text($2) "=NN")
+  - Akademie/NN der/ART Wissenschaften/NN -- Akademie_der_Wissenschaften/-(:NE) !!! (later) x-impossible error!
+
+MWE [ADJ NN] --> (text($2) "=NN")
+  - Weiße/ADJA Haus/NN -- Weiße_Haus/-(:NN)
+  - Vereinten/ADJA Nationen/NN -- Vereinten_Nationen/-(:NE) !!! (later) x-impossible error!
+
+MWE [FM] --> (text($2) "NN")
+  - New/FM Age/FM -- New_Age/-(:NN)          !!! (later) x-impossible error!
+  - High/FM School/FM -- High_School/-(:NN)  !!! (later) x-impossible error!
+
+MWE [NE] --> (text($2) "=NE")
+  - General/NE Motors/NE -- General_Motors/-
+  - Coca/NE Cola/NE -- Coca_Cola/-(:NE)
+
+Punctuation breaks [hyphenation & co.] --> $1
+  - St.-Pauli-Landungsbrücken/NE -- St./XY,$ABBREV -Pauli/TRUNC -Landungsbrücken/TRUNC
+  - CDU\/CSU-Bundestagsfraktion/NN -- CDU/- \//$( CSU-Bundestagsfraktion/-
+  - ``Aldi''-Brüder/NN -- ``/$( Aldi/- ''/$( -Brüder/TRUNC
+  - ``Premium''-Zuschlag/NN -- ``/$( Premium/- ''/$( -Zuschlag/TRUNC
+  - ("...") .../$( -- ./$. ../$.
+  - ("....") .../$( ./$. -- .../$.
+  - ("gibt 's") gibt/VVFIN 's/PPER -- gibt/- '/$( s/-  [-- MAYBE sentence-text heuristic error --]
+
+Numeric breaks --> $1
+  - 62jährigen/NN -- 62/CARD jährigen/-
+  - 60er/ADJA -- 60/CARD er/-
+  - 100tägige/ADJA -- 100/CARD tägige/-
+  - 129a-Ermittlungsverfahren/NN -- 129/CARD a-Ermittlungsverfahren/-
+  - G7/NE -- G/- 7/CARD
+  - '92/CARD -- '/$( 92/CARD
+  - F-16/NE -- F-/- 16/CARD
+  - 10e/XY -- 10/CARD e/-
+
+(Bad) Abbrs --> $1
+  - Az/NN ./$. -- Az./XY,$ABBREV
+  - eng/ADJD ./$. -- eng./XY,$ABBREV
+  - Not/NN ./$. -- Not./XY,$ABBREV
+  - Haft/NN ./$. -- Haft./XY,$ABBREV
+  - Rat/NN ./$. -- Rat./XY,$ABBREV
+
+Dates --> (text($2) ("=".tag(last($1)) analyses($2))
+  - 25./ADJA Dezember/NN -- 25._Dezember/XY,$DATE
+  - 31./ADJA Dezember/NN 1992/NN -- 31._Dezember_1992/XY,$DATE
+  - 8./ADJA Mai/NN 1945/CARD -- 8._Mai_1945/XY,$DATE             !!! bug: tiger-internal inconsistency !!!
+
+Numeric grouping --> $2
+  - 50/CARD 000/CARD -- 50_000/CARD
+
+EOS from training corpus --> $1
+  - ''/$( EOS Konzernchefs/NN -- ''/$( Konzernchefs/-
+  - Jaschke/NE :/$. Aber/KON -- Jashke/NE :/$. -/EOS Aber/KON
+
+Comments from training corpus --> $1
+  - %% Sentence s1 -- (nil)
+
+
+##------------------------------------------------------------------------
+## BUGS: diff, tiger-auto
+
++ orig-tok, near bos orig s30307:
+@ c 604522,604522 568195,568195 :1
+< ...	$(
+> .	$.
+@ a 604522,604521 568196,568196 :1
+> 
+@ a 604522,604521 568197,568197 :0
+> ..	$.
+~ <...	<$(
+~ >Lafontaine
+@ d 604524,604524 568199,568198 :1
+< %% Sentence s30307
+~ ~Lafontaine	<NE
+
+
+##------------------------------------------------------------------------
+## BUGS: Tokenizer
+
+(bei dem am) 17. Juni 42 (Menschen ermordert wurden) [Mantis Bug id=30]
+  - got: "17._Juni_42/XY,$DATE"
+  - want: "17._Juni/$DATE 42/CARD"
