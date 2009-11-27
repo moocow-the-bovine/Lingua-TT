@@ -7,6 +7,7 @@
 package Lingua::TT::Document;
 use Lingua::TT::Token;
 use Lingua::TT::Sentence;
+use Encode qw(encode decode);
 use strict;
 
 ##==============================================================================
@@ -115,6 +116,9 @@ sub flat {
 ##==============================================================================
 ## Methods: I/O
 
+##--------------------------------------------------------------
+## Methods: I/O: TT
+
 ## $str = $doc->toString()
 ##  + returns string representing $doc
 sub toString {
@@ -154,6 +158,7 @@ sub toFile {
   $ttio->close();
   return $rc ? $doc : undef;
 }
+
 
 ##==============================================================================
 ## Methods: Shuffle & Split
