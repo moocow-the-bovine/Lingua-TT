@@ -9,22 +9,34 @@ MWE (undesirables)
   - Hin/NN und/KON Her/NN -- Hin_und_Her/-(:NN)
   - auf/APPR jeden/PIAT Fall/NN -- auf_jeden_Fall/-(:ADV)
 
+Dates (weirdness)
+  - 5./ADJA 1./ADJA '96/CARD -- 5._1._/XY,$DATE '/$( 96/CARD
+
 ##------------------------------------------------------------------------
 ## DONE
 
 MWE [NE NN] --> (text($2) "=NE")
   - Barmer/NE Ersatzkasse/NN -- Barmer_Erstatzkasse/-(:NE)
 
+MWE [NN NE] --> (text($2) "=NE")
+  - Bundesrepublik/NN Deutschland/NE -- Bundesrepublik_Deutschland/-(:NE)
+
 MWE [NN ART NN] --> (text($2) "=NN")
   - Akademie/NN der/ART Wissenschaften/NN -- Akademie_der_Wissenschaften/-(:NE) !!! (later) x-impossible error!
 
-MWE [ADJ NN] --> (text($2) "=NN")
+MWE [(ADJ|ART) (NN|NE)] --> (text($2) "=".tag(last($1)))
   - Weiße/ADJA Haus/NN -- Weiße_Haus/-(:NN)
-  - Vereinten/ADJA Nationen/NN -- Vereinten_Nationen/-(:NE) !!! (later) x-impossible error!
+  - Bremer/ADJA Vulkan/NE -- Bremer_Vulkan/-(:NE)
+  - Vereinten/ADJA Nationen/NN -- Vereinten_Nationen/-(:NE) !!! (moot) x-impossible error!
+  - Die/ART Grünen/NN -- Die_Grünen/-(:NE)                  !!! (moot) x-impossible error!
 
 MWE [FM] --> (text($2) "NN")
-  - New/FM Age/FM -- New_Age/-(:NN)          !!! (later) x-impossible error!
-  - High/FM School/FM -- High_School/-(:NN)  !!! (later) x-impossible error!
+  - New/FM Age/FM -- New_Age/-(:NN)          !!! (moot) x-impossible error!
+  - High/FM School/FM -- High_School/-(:NN)  !!! (moot) x-impossible error!
+
+MWE [NN] --> (text($2) "=NN")
+  - IG/NN Metall/NN -- IG_Metall/-(:NE)
+  - Road/TRUNC Movie/NN -- Road_Movie/-(:NN)
 
 MWE [NE] --> (text($2) "=NE")
   - General/NE Motors/NE -- General_Motors/-
@@ -74,20 +86,6 @@ Comments from training corpus --> $1
 
 ##------------------------------------------------------------------------
 ## BUGS: diff, tiger-auto
-
-+ orig-tok, near bos orig s30307:
-@ c 604522,604522 568195,568195 :1
-< ...	$(
-> .	$.
-@ a 604522,604521 568196,568196 :1
-> 
-@ a 604522,604521 568197,568197 :0
-> ..	$.
-~ <...	<$(
-~ >Lafontaine
-@ d 604524,604524 568199,568198 :1
-< %% Sentence s30307
-~ ~Lafontaine	<NE
 
 
 ##------------------------------------------------------------------------
