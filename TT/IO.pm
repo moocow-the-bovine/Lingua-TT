@@ -25,16 +25,19 @@ use strict;
 ## $io = CLASS_OR_OBJECT->new(%opts)
 ## + $io: HASH-ref
 ##    (
-##     encoding => $encoding,  ##-- I/O encoding (default: 'UTF-8')
+##     encoding => $encoding,  ##-- I/O encoding (default: undef)
+##                             ##   + uses perlio :encoding($encoding) layer
+##                             ##   + undef (default) uses perl default (locale?)
+##                             ##   + undef gives fastest I/O, since no translation is required
 ##     fh       => $fh,        ##-- underlying filehandle (default: none)
 ##     name     => $name,      ##-- source name to use for error reporting (defualt: none)
 ##    )
 sub new {
   my $that = shift;
   return bless({
-		encoding => 'UTF-8',
+		encoding => undef,
 		fh       => undef,
-		name      => undef,
+		name     => undef,
 		@_,
 	       }, ref($that)||$that);
 }
@@ -60,7 +63,7 @@ sub close {
 
 ## $io = CLASS_OR_OBJECT->open($mode,$src,%opts)
 ##  + opens $io with $mode on $src
-##  + %opts: clobbers %$io
+##  + %opts: clobbers %$io (e.g. encoding=>$encoding)
 sub open {
   my ($io,$mode,$src,%opts) = @_;
   $io = $io->new if (!ref($io));
@@ -75,6 +78,7 @@ sub open {
     $io->{fh} = IO::File->new($mode.$src)
       or confess(ref($io)."::open(): open failed with mode '$mode' for file '$src': $!");
   }
+  binmode($io->{fh},":encoding($io->{encoding})") if ($io->{encoding});
   return $io;
 }
 
@@ -143,8 +147,7 @@ sub toString {
 sub getToken {
   my $io = shift;
   return undef if ($io->eof);
-  #return Lingua::TT::Token->newFromString(decode($io->{encoding},$io->{fh}->getline));
-  return bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$io->{fh}->getline))], 'Lingua::TT::Token');
+  return bless([split(/[\n\r]*[\t\n\r][\n\r]*/,$io->{fh}->getline)], 'Lingua::TT::Token');
 }
 
 ## $sent_or_undef = $io->getSentence()
@@ -157,8 +160,7 @@ sub getSentence {
   my ($line);
   while (defined($line=$io->{fh}->getline)) {
     last if ($line =~ /^\r?$/);
-    #push(@$sent, Lingua::TT::Token->newFromString(decode($io->{encoding},$line)));
-    push(@$sent, bless([split(/[\n\r]*[\t\n\r][\n\r]*/,decode($io->{encoding},$line))], 'Lingua::TT::Token'));
+    push(@$sent, bless([split(/[\n\r]*[\t\n\r][\n\r]*/,$line)], 'Lingua::TT::Token'));
   }
   return $sent;
 }
@@ -175,8 +177,7 @@ sub getDocument {
     local $/ = undef;
     $buf = <$fh>;
   }
-  $buf = decode($io->{encoding},$buf);
-  my $doc   = bless([],'Lingua::TT::Document');
+  my $doc = bless([],'Lingua::TT::Document');
   @$doc = map {
     bless([
 	   map {
@@ -187,6 +188,14 @@ sub getDocument {
   } split(/(?:\r?\n){2}/, $buf);
 
   return $doc;
+}
+
+## $line = $io->getLine();
+##  + gets a single line from input stream, or undef on eof
+##  + basically just a wrapper for the <> operator
+sub getLine {
+  my $fh = $_[0]{fh};
+  return scalar(<$fh>);
 }
 
 ## \@lines = $io->getLines();   ##-- scalar context
@@ -200,7 +209,7 @@ sub getLines {
   my ($buf);
   {
     local $/ = undef;
-    $buf = decode($io->{encoding},scalar(<$fh>));
+    $buf = scalar(<$fh>);
   }
   my $lines = [split(/\r?\n/, $buf)];
   return wantarray ? @$lines : $lines;
@@ -213,19 +222,25 @@ sub getLines {
 ## $io = $io->putToken($tok)
 ##  + writes $tok to output stream
 sub putToken {
-  $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString), "\n");
+  $_[0]{fh}->print(join("\t", @{$_[1]})."\n");
 }
 
 ## $io = $io->putSentence($sent)
 ##  + writes $sent to output stream
 sub putSentence {
-  $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString), "\n");
+  $_[0]{fh}->print(join("\n", map {join("\t",@$_)} @{$_[1]})."\n\n");
 }
 
 ## $io = $io->putDocument($doc)
 ##  + writes $doc to output stream
 sub putDocument {
-  $_[0]{fh}->print(encode($_[0]{encoding},$_[1]->toString)); #, "\n"
+  $_[0]{fh}->print(map { join("\n",map {join("\t",@$_)} @$_)."\n\n" } @{$_[1]});
+}
+
+## undef = $io->print(@data)
+##  + wrapper for $io->{fh}->print(@data)
+sub print {
+  $_[0]{fh}->print(@_[1..$#_]);
 }
 
 ## $io = $io->putLines(@lines);
@@ -235,7 +250,6 @@ sub putLines {
   my $io = shift;
   my $lines = @_==1 && ref($_[0]) ? $_[0] : [@_];
   my $buf = join("\n",@$lines)."\n";
-  $buf = encode($io->{encoding},$buf);
   $io->{fh}->print($buf);
   return $io;
 }

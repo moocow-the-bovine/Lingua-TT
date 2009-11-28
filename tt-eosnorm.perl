@@ -19,7 +19,7 @@ our $progname     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
-our $encoding     = 'UTF-8';
+our $encoding     = undef;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -66,28 +66,30 @@ sub vmsg {
 push(@ARGV, '-') if (!@ARGV);
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
   or die("$0: open failed for output file '$outfile': $!");
+our $outfh = $ttout->{fh};
 
 our $last_was_eos = 0;
-my ($tok);
+my ($infh,$line);
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
     or die("$0: open failed for input file '$infile': $!");
+  $infh = $ttin->{fh};
 
-  while (defined($tok=$ttin->getToken)) {
-    if ($tok->isEmpty) {
-      $ttout->putToken($tok) if (!$last_was_eos);
+  while (defined($line=<$infh>)) {
+    if ($line =~ /^$/) {
+      $outfh->print($line) if (!$last_was_eos);
       $last_was_eos = 1;
     }
-    elsif ($tok->isComment) {
-      $ttout->putToken($tok);
+    elsif ($line =~ /^\%\%/) {
+      $outfh->print($line);
     }
     else {
-      $ttout->putToken($tok);
+      $outfh->print($line);
       $last_was_eos = 0;
     }
   }
 }
-$ttout->{fh}->print("\n") if (!$last_was_eos);
+$outfh->print("\n") if (!$last_was_eos);
 $ttout->close();
 
 
@@ -114,7 +116,7 @@ tt-eosnorm.perl - normalize sentence boundary markers (blank lines) in TT files
 
  Other Options:
    -output FILE         ##-- default: STDOUT
-   -encoding ENC        ##-- default: UTF-8
+   -encoding ENC        ##-- default: (none)
 
 =cut
 

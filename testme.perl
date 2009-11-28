@@ -2,6 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
+use Encode qw(encode decode);
 
 ##----------------------------------------------------------------------
 sub test_token {
@@ -22,7 +23,7 @@ sub test_sent {
   my $sent2 = Lingua::TT::Sentence->newFromString($str2);
   my $raw2 = $sent2->rawString();
 
-  my $sent3 = Lingua::TT::Sentence->new(map {Lingua::TT::Token->new($_)} qw(`` foo),',',qw('' said he ; bar .));
+  my $sent3 = Lingua::TT::Sentence->new(map {Lingua::TT::Token->new($_)} qw(`` foo),',',qw('' said he; I 'm done .));
   my $raw3  = $sent3->rawString;
   print STDERR "$0: test_sent() done: what now?\n";
 }
@@ -35,7 +36,7 @@ sub test_doc {
   my $doc  = Lingua::TT::Document->newFromString($str1.$str2);
   print STDERR "$0: test_doc() done: what now?\n";
 }
-#test_doc();
+test_doc();
 
 ##----------------------------------------------------------------------
 sub test_io {
