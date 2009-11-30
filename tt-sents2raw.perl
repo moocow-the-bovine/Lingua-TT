@@ -32,6 +32,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
+	   'encoding|e=s' => \$ioargs{encoding},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);

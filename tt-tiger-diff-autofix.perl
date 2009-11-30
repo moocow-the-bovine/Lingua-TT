@@ -189,6 +189,14 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = 1;
     }
+  ##-- CHANGE: Punctuation non-breaks: $1 ~ (*/* */\'\w+) & $2 ~ (...) --> $1
+  elsif ($op eq 'c'
+	 && @items1==2
+	 && $items1[1] =~ /^\'\w+\t/
+	 && @items2==1)
+    {
+      $hunk->[5] = 1;
+    }
   ##-- CHANGE: MWE (NE): $1 ~ (*/NE)+ & $2 ~ (*_*/-) -> text($2) "=NE"
   elsif ($op eq 'c'
 	 && @items1==(grep {/\tNE$/} @items1)
@@ -255,6 +263,15 @@ foreach $hunk (@$hunks) {
 	 && $items2[0] =~ /^[[:alpha:]\_]+$/)
     {
       $hunk->[5] = [$items2[0]."\t=NE"];
+    }
+  ##-- CHANGE: MWE (bad): $1 ~ (... */(APPR*|KON|PIAT) ...) --> $1
+  elsif ($op eq 'c'
+	 && @items1>1
+	 && (grep { /\t(?:APPR|KON|PIAT)/ } @items1)
+	 && @items2==1
+	 && $items2[0] =~ /^[[:alpha:]\_]+$/)
+    {
+      $hunk->[5] = 1;
     }
 }
 

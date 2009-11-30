@@ -139,22 +139,28 @@ foreach $field (@fields) {
 }
 
 $ttin  = Lingua::TT::IO->new();
-$ttout = Lingua::TT::IO->new->toFile($outfile)
+$ttout = Lingua::TT::IO->new->toFile($outfile,encoding=>undef)
   or die("$prog: open failed for '$outfile': $!");
+our $outfh = $ttout->{fh};
 
 our ($fspec,$tokin);
 our ($last_was_eos);
 our $tokout = Lingua::TT::Token->new;
 foreach $ttfile (@ARGV) {
-  $ttin->fromFile($ttfile)
+  $ttin->fromFile($ttfile,encoding=>undef)
     or die("$prog: open failed for '$ttfile': $!");
+  our $infh = $ttin->{fh};
 
-  while (defined($tokin=$ttin->getToken)) {
-    if (!$tokin->isVanilla) {
-      $ttout->putToken($tokin);
+  while (defined($_=<$infh>)) {
+    if (/^\%\%/ || /^$/) {
+      $outfh->print($_); ##-- pass through comments & blank lines
       next;
     }
     @$tokout = qw();
+
+    ##-- parse tokens
+    s/\r?\n?$//;
+    @$tokin = split(/\t/,$_);
 
     foreach $fspec (@fieldspecs) {
       if (!ref($fspec)) {
@@ -176,11 +182,12 @@ foreach $ttfile (@ARGV) {
 	push(@$tokout, @$tokin[$start..($end-1)]);
       }
     }
-    $ttout->putToken($tokout);
+    $outfh->print(join("\t",@$tokout), "\n");
   } continue {
-    $last_was_eos = ($tokin->isEmpty);
+    $last_was_eos = ($_ =~ /^$/);
   }
-  $ttout->{fh}->print("\n") if (!$last_was_eos);
+  $outfh->print("\n") if (!$last_was_eos);
+  $ttin->close();
 }
 
 ##-- cleanup
