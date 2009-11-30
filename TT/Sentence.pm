@@ -100,7 +100,7 @@ sub rawString {
   foreach $i (1..$#$sent) {
     ($t1,$t2) = @$sent[($i-1),$i];
     next if ($t2->[0] =~ /^(?:[\]\)\%\.\,\:\;\!\?]|\'\'|\'[[:alpha:]]+)$/); ##-- no token-boundary space BEFORE these text types
-    next if ($t1->[0] =~ /^(?:[\[\(])|\`\`$/);                     ##-- no token-boundary space AFTER  these text types
+    next if ($t1->[0] =~ /^(?:[\[\(]|\`\`)$/);                     ##-- no token-boundary space AFTER  these text types
     $spaces[$i] = ' ';                                             ##-- default: add token-boundary space
   }
 
