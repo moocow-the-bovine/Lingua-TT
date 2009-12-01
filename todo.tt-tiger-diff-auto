@@ -6,23 +6,30 @@
 Dates (weirdness)
   - 5./ADJA 1./ADJA '96/CARD -- 5._1._/XY,$DATE '/$( 96/CARD
 
+MWE (other) --> ??
+  - kreuz/ADV und/KON quer/ADV -- kreuz_und_quer/-(:ADV)
+  - sage/VVIMP und/KON schreibe/VVIMP -- sage_und_schreibe/-(:ADV)
+  - Status/NN quo/FM -- Status_quo/-(:NN)
+
 ##------------------------------------------------------------------------
 ## DONE, Not yet documented
+
+##------------------------------------------------------------------------
+## DONE & Documented
 
 Punctuation non-breaks --> $1
   - gibt/VVFIN 's/PPER -- gibt's/-(:-)
   - für/APPR 'n/ART -- für'n/-(:-)
   - und/KON 'n/ART -- und'n/-(:-)
 
-MWE (undesirables) --> $1
+MWE [NN KON NN] --> $1
+  - Hin/NN und/KON Her/NN -- Hin_und_Her/-(:NN)
+  - Hab/NN und/KON Gut/NN -- Hab_und_Gut/-(:NN)
+
+MWE [PP] --> $1
   - am/APPRART Rande/NN -- am_Rande/-(:ADV)
   - mit/APPR Hilfe/NN -- mit_Hilfe/-(:ADV)
-  - Hin/NN und/KON Her/NN -- Hin_und_Her/-(:NN)
   - auf/APPR jeden/PIAT Fall/NN -- auf_jeden_Fall/-(:ADV)
-
-
-##------------------------------------------------------------------------
-## DONE & Documented
 
 MWE [NE NN] --> (text($2) "=NE")
   - Barmer/NE Ersatzkasse/NN -- Barmer_Erstatzkasse/-(:NE)
