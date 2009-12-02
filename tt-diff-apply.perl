@@ -21,7 +21,7 @@ our $verbose      = 1;
 
 our $outfile      = '-';
 our %diffargs     = qw();
-our %appargs      = ( prefer=>1, fix=>1 );
+our %appargs      = ( prefer=>1, fix=>1, aux1=>undef, aux2=>undef );
 our %ioargs       = ( encoding=>'UTF-8');
 
 ##----------------------------------------------------------------------
@@ -37,6 +37,8 @@ GetOptions(##-- general
 	   'prefer|pref|which|p|w=i' => \$appargs{prefer},
 	   '1' => sub { $appargs{prefer}=1; },
 	   '2' => sub { $appargs{prefer}=2; },
+	   'aux1|a1!' => \$appargs{aux1},
+	   'aux2|a2!' => \$appargs{aux2},
 	   'fixes|fix|f!' => \$appargs{fix},
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'output|o=s' => \$outfile,

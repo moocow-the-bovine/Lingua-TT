@@ -94,13 +94,13 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = 1;
     }
-  ##-- DELETE: $1 ~ "''"@eos -> $1
-  elsif ($op eq 'd' && @items1==1 && $items1[0]=~/^\'\'\t/ && ($max1==$#$seq1 || $seq1->[$max1+1]=~/^$/))
+  ##-- DELETE: $1 ~ (''|")/* @eos -> $1
+  elsif ($op eq 'd' && @items1==1 && $items1[0]=~/^(?:\'\'|\")\t/ && ($max1==$#$seq1 || $seq1->[$max1+1]=~/^$/))
     {
       $hunk->[5] = 1;
     }
-  ##-- INSERT: $2 ~ "''"@bos -> $1
-  elsif ($op eq 'a' && @items2==1 && $items2[0]=~/^\'\'(?:\t|$)/ && ($min2==0 || $seq2->[$min2-1]=~/^$/))
+  ##-- INSERT: $2 ~ (''|")/* @bos -> $1
+  elsif ($op eq 'a' && @items2==1 && $items2[0]=~/^(?:\'\'|\")(?:\t|$)/ && ($min2==0 || $seq2->[$min2-1]=~/^$/))
     {
       $hunk->[5] = 1;
     }
@@ -116,11 +116,11 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = 1;
     }
-  ##-- CHANGE: $1 ~ (%%) & $2 ~ (''/*) @ bos -> $1 : DANGEROUS (with ellipsis)
+  ##-- CHANGE: $1 ~ (%%) & $2 ~ ((''|")/*) @ bos -> $1 : DANGEROUS (with ellipsis)
   elsif ($op eq 'c'
 	 && @items1==(grep {/^\%\%/} @items1)
 	 && @items2==1
-	 && $items2[0] =~ /^\'\'(?:\t|$)/
+	 && $items2[0] =~ /^(?:\'\'|\")(?:\t|$)/
 	 && ($min2==0 || $seq2->[$min2-1]=~/^$/))
     {
       $hunk->[5] = 1;
@@ -151,8 +151,8 @@ foreach $hunk (@$hunks) {
     {
       $tag1 = $items1[$#items1];   $tag1  =~ s/^.*\t//;
       $txt2 = $items2[0];          $txt2  =~ s/\t.*//;
-      $anl2 = $items2[0];          $anl2  =~ s/^[^\t]*\t//;   $anl2 =~ s/\t/\t\>/g;
-      $hunk->[5] = [$txt2."\t".'<'.$tag1."\t".$anl2];
+      $anl2 = $items2[0];          $anl2  =~ s/^[^\t]*//;   $anl2 =~ s/\t/\t\>/g;
+      $hunk->[5] = [$txt2."\t".'<'.$tag1.$anl2];
     }
   ##-- CHANGE: Dates: $1 ~ (ADJ*) & $2 ~ DATE -> text($2).("<" tag(last($1))).(">" analyses($2))
   elsif ($op eq 'c'
@@ -162,8 +162,8 @@ foreach $hunk (@$hunks) {
     {
       $tag1 = $items1[$#items1];   $tag1  =~ s/^.*\t//;
       $txt2 = $items2[0];          $txt2  =~ s/\t.*//;
-      $anl2 = $items2[0];          $anl2  =~ s/^[^\t]*\t//;   $anl2 =~ s/\t/\t\>/g;
-      $hunk->[5] = [$txt2."\t".'<'.$tag1."\t".$anl2];
+      $anl2 = $items2[0];          $anl2  =~ s/^[^\t]*//;   $anl2 =~ s/\t/\t\>/g;
+      $hunk->[5] = [$txt2."\t".'<'.$tag1.$anl2];
     }
   ##-- CHANGE: Abbrs: $1 ~ (*/* ./$. (eos|cmt)*) & $2 ~ (*./XY,$ABBREV) -> $1
   elsif ($op eq 'c'
@@ -197,27 +197,27 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = 1;
     }
-  ##-- CHANGE: MWE (NE): $1 ~ (*/NE)+ & $2 ~ (*_*/-) -> text($2) "<NE"
+  ##-- CHANGE: MWE (NE)+: $1 ~ (*/NE)+ & $2 ~ (*_*/-) -> text($2) "<NE"
   elsif ($op eq 'c'
 	 && @items1==(grep {/\tNE$/} @items1)
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<NE"];
     }
-  ##-- CHANGE: MWE (NN|TRUNC): $1 ~ (*/(NN|TRUNC))+ & $2 ~ (*_*/-) -> text($2) "<NN"
+  ##-- CHANGE: MWE (NN|TRUNC)+: $1 ~ (*/(NN|TRUNC))+ & $2 ~ (*_*/-) -> text($2) "<NN"
   elsif ($op eq 'c'
 	 && @items1==(grep {/\t(?:NN|TRUNC)$/} @items1)
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<NN"];
     }
-  ##-- CHANGE: MWE (FM): $1 ~ (*/FM)+ & $2 ~ (*_*/-) -> text($2) "<FM"
+  ##-- CHANGE: MWE (FM)+: $1 ~ (*/FM)+ & $2 ~ (*_*/-) -> text($2) "<FM"
   elsif ($op eq 'c'
 	 && @items1==(grep {/\tFM$/} @items1)
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<FM"];
     }
@@ -227,7 +227,7 @@ foreach $hunk (@$hunks) {
 	 && $items1[0] =~ /\t(?:ADJ|ART$)/
 	 && (@items1-1)== (grep {/\tN[NE]$/} @items1[1..$#items1])
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $tag1 = $items1[$#items1];
       $tag1 =~ s/^[^\t]*//;
@@ -240,7 +240,7 @@ foreach $hunk (@$hunks) {
 	 && $items1[1] =~ /\tART$/
 	 && $items1[2] =~ /\tNN$/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<NN"];
     }
@@ -250,7 +250,7 @@ foreach $hunk (@$hunks) {
 	 && ((@items1-1)==grep{/\tNE$/} @items1[0..($#items1-1)])
 	 && $items1[$#items1] =~ /\tNN$/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<NE"];
     }
@@ -260,7 +260,16 @@ foreach $hunk (@$hunks) {
 	 && $items1[0] =~ /\tNN$/
 	 && $items1[1] =~ /\tNE$/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
+    {
+      $hunk->[5] = [$items2[0]."\t<NE"];
+    }
+  ##-- CHANGE: MWE (NN|NE)+: $1 ~ (*/(NN|NE))+ & $2 ~ (*_*/-) -> text($2) "<NE"
+  elsif ($op eq 'c'
+	 && @items1>1
+	 && @items1==(grep{/\t(?:NN|NE)$/} @items1)
+	 && @items2==1
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = [$items2[0]."\t<NE"];
     }
@@ -271,7 +280,7 @@ foreach $hunk (@$hunks) {
 	 && $items1[1] =~ /\tKON$/
 	 && $items1[2] =~ /\tNN$/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = 1;
     }
@@ -282,16 +291,16 @@ foreach $hunk (@$hunks) {
 	 && $items1[1] =~ /\tKON$/
 	 && $items1[2] =~ /\tADV$/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = 1;
     }
   ##-- CHANGE: MWE (PP): $1 ~ (*/(APPR*) ...) & $2 ~ (*_*/*) --> $1
   elsif ($op eq 'c'
 	 && @items1>1
-	 && $items1[0] =~ /^\tAPPR/
+	 && $items1[0] =~ /\tAPPR/
 	 && @items2==1
-	 && $items2[0] =~ /^[[:alpha:]]+\_[[:alpha:]\_]+$/)
+	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
       $hunk->[5] = 1;
     }

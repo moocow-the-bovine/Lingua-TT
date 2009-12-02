@@ -32,6 +32,11 @@ our $DIFF = 'diff'; ##-- search in path
 ##   key1  => \&keysub,   ##-- keygen sub for $seq1 (default=\&ksText), called as $key=$keysub->($diff,$line)
 ##   key2  => \&keysub,   ##-- keygen sub for $seq2 (default=\&ksText), called as $key=$keysub->($diff,$line)
 ##   ##
+##   aux1 => \%aux1,       ##-- aux data: ($seq1i=>\@auxLinesBeforeSeq1i)
+##   aux2 => \%aux2,       ##-- aux data: ($seq2i=>\@auxLinesBeforeSeq2i)
+##   auxEOS  => $bool,     ##-- if true, EOS lines will be considered "aux" data (default=false)
+##   auxComments => $bool, ##-- if true, comment lines will be considered "aux" data (default=false)
+##   ##
 ##   ##-- misc options
 ##   keeptmp => $bool,    ##-- if true, temp files will not be unlinked (default=false)
 ##   ##
@@ -60,10 +65,16 @@ sub new {
 		    key1 => \&ksText,
 		    key2 => \&ksText,
 
+		    ##-- aux data
+		    aux1 => {},
+		    aux2 => {},
+		    auxEOS => 0,
+		    auxComments => 0,
+
 		    ##-- cache data
+		    keeptmp  => 0,
 		    tmpfile1 => undef,
 		    tmpfile2 => undef,
-		    keeptmp  => 0,
 
 		    ##-- diff data
 		    hunks => [],
@@ -82,6 +93,8 @@ sub reset {
   $diff->clearCache;
   @{$diff->{seq1}} = qw();
   @{$diff->{seq2}} = qw();
+  %{$diff->{aux1}} = qw();
+  %{$diff->{aux2}} = qw();
   @{$diff->{hunks}} = qw();
   delete(@$diff{qw(file1 file2)});
   return $diff;
@@ -147,31 +160,59 @@ sub seq2 {
 ##     - a flat array-ref of line-strings (without terminating newlines)
 ##     - a filehandle
 ##     - a filename
+##   + implicitly calls $diff->setAux($which)
 BEGIN { *isa = \&UNIVERSAL::isa; }
 sub setSequence {
   my ($diff,$i,$src,%opts) = @_;
   $i = $diff->checkWhich($i);
+  my $rc = undef;
   if (isa($src,'Lingua::TT::Sentence')) {
-    return $diff->sequenceSentence($i,$src,%opts);   ##-- Lingua::TT::Sentence
+    $rc = $diff->sequenceSentence($i,$src,%opts);   ##-- Lingua::TT::Sentence
   }
   elsif (isa($src,'Lingua::TT::Document')) {
-    return $diff->sequenceDocument($i,$src,%opts);   ##-- Lingua::TT::Document
+    $rc = $diff->sequenceDocument($i,$src,%opts);   ##-- Lingua::TT::Document
   }
   elsif (isa($src,'Lingua::TT::IO')) {
-    return $diff->sequenceIO($i,$src,%opts);         ##-- Lingua::TT::IO
+    $rc = $diff->sequenceIO($i,$src,%opts);         ##-- Lingua::TT::IO
   }
   elsif (isa($src,'IO::Handle')) {
-    return $diff->sequenceFile($i,$src,%opts);       ##-- IO::Handle
+    $rc = $diff->sequenceFile($i,$src,%opts);       ##-- IO::Handle
   }
   elsif (isa($src,'ARRAY')) {
-    return $diff->sequenceLines($i,$src,%opts);      ##-- array of lines
+    $rc = $diff->sequenceLines($i,$src,%opts);      ##-- array of lines
   }
   elsif (!ref($src)) {
-    return $diff->sequenceFile($i,$src,%opts);       ##-- filename
+    $rc = $diff->sequenceFile($i,$src,%opts);       ##-- filename
   }
-  ##
-  return $diff->sequenceFile($i,$src,%opts);         ##-- other ref; maybe a filehandle?
+  else {
+    $rc = $diff->sequenceFile($i,$src,%opts);         ##-- other ref; maybe a filehandle?
+  }
+  return defined($rc) ? $rc->setAux($i,%opts) : undef;
 }
+
+##----------------------------------------------------------------------
+## Methods: Sequence Selection: Aux data
+
+## $diff = $diff->setAux($which)
+##  + auto-computes $diff->{"aux${which}"} from $diff->{"seq${which}"}
+sub setAux {
+  my ($diff,$which) = @_;
+  $which = $diff->checkWhich($which);
+
+  my $seq = $diff->{"seq${which}"};
+  my $aux = $diff->{"aux${which}"};
+  %$aux   = qw();
+  my ($i,$j);
+  for ($i=0; $i<=$#$seq; $i++) {
+    if ( ($diff->{auxEOS} && $seq->[$i]=~/^$/) || ($diff->{auxComments} && $seq->[$i]=~/^\%\%/) ) {
+      push(@{$aux->{$i}}, splice(@$seq,$i,1));
+      --$i;
+    }
+  }
+
+  return $diff;
+}
+
 
 ##----------------------------------------------------------------------
 ## Methods: Sequence Selection: Low-Level
@@ -330,7 +371,9 @@ sub seqTempFile {
 ##  + get "fixed" sequence from fully populated diff
 ##  + %opts:
 ##     prefer => $which,      ##-- prefer/project which sequence (1 or 2); default=1
-##     fix => $bool,          ##-- allow fixes to override preference? default=true
+##     fix    => $bool,       ##-- allow fixes to override preference? default=true
+##     aux1   => $bool,       ##-- include aux1 items? (default: ($prefer==1))
+##     aux2   => $bool,       ##-- include aux2 items? (default: ($prefer==2))
 sub apply {
   my ($diff,%opts) = @_;
 
@@ -338,26 +381,49 @@ sub apply {
   %opts = (prefer=>1,fix=>1,%opts);
   my $pref = $opts{prefer};
   my $pfix = $opts{fix};
+  my $dump_aux1 = defined($opts{aux1}) ? $opts{aux1} : ($pref==1);
+  my $dump_aux2 = defined($opts{aux2}) ? $opts{aux2} : ($pref==2);
 
   ##-- output sequence
   my $seq3 = [];
 
   ##-- loop: vars
-  my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
-  my ($hunk, $op,$min1,$max1,$min2,$max2, $fix);
+  my ($seq1,$seq2,$aux1,$aux2,$hunks) = @$diff{qw(seq1 seq2 aux1 aux2 hunks)};
+  my ($hunk,$hmax);
+  my ($op,$min1,$max1,$min2,$max2, $fix) ;
   my ($i1,$i2) = (0,0);
-  foreach $hunk (@{$diff->{hunks}}) {
+
+  foreach $hunk (@$hunks) {
     ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
 
-    ##-- dump preceding context
-    push(@$seq3, $pref==1 ? @$seq1[$i1..($min1-1)] : @$seq2[$i2..($min2-1)]);
+    ##-- context: shared
+    push(@$seq3,
+	 map {
+	   (($dump_aux1 && exists($aux1->{$i1+$_}) ? @{$aux1->{$i1+$_}} : qw()),
+	    ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
+	    ($pref==1 ? $seq1->[$i1+$_] : qw()),
+	    ($pref==2 ? $seq2->[$i2+$_] : qw()))
+	 } (0..($min1-$i1-1)));
 
-    ##-- resolve conflict
-    if ($pfix && defined($fix)) {
-      push(@$seq3, (ref($fix) ? @$fix : ($fix==1 ? @$seq1[$min1..$max1] : @$seq2[$min2..$max2])));
-    } else {
-      push(@$seq3, $pref==1 ? @$seq1[$min1..$max1] : @$seq2[$min2..$max2]);
+    ##-- current item (hunk-internal)
+    if (!$pfix || !ref($fix)) {
+      $fix = [@$seq1[$min1..$max1]] if ($pfix ? (!$fix || $fix==1) : ($pref==1));
+      $fix = [@$seq2[$min2..$max2]] if ($pfix ? (!$fix || $fix==2) : ($pref==2));
+    }elsif (ref($fix) && $pref==1) {
+      $fix = [ map {s/(?:^|\t)\>[^\t]*//g; s/(^|\t)[\~\<]/$1/g; $_} @$fix ];
+    } elsif (ref($fix) && $pref==2) {
+      $fix = [ map {s/(?:^|\t)\<[^\t]*//g; s/(^|\t)[\~\>]/$1/g; $_} @$fix ];
     }
+    $hmax = ($max1-$min1);
+    $hmax = ($max2-$min2) if ($hmax < $max2-$min2);
+    $hmax = $#$fix if ($hmax < $#$fix);
+
+    push(@$seq3,
+	 map {
+	   (($min1+$_<=$max1 && $dump_aux1 && exists($aux1->{$min1+$_}) ? @{$aux1->{$min1+$_}} : qw()),
+	    ($min2+$_<=$max2 && $dump_aux2 && exists($aux2->{$min2+$_}) ? @{$aux2->{$min2+$_}} : qw()),
+	    ($_ <= $#$fix ? $fix->[$_] : qw()))
+	 } (0..$hmax));
 
     ##-- update current position counters (with safety checks for hacked diffs)
     $max1 = $min1 if ($min1>$max1);
@@ -366,8 +432,14 @@ sub apply {
     $i2 = $max2+1 if ($max2 >= $i2);
   }
 
-  ##-- dump trailing context
-  push(@$seq3, $pref==1 ? @$seq1[$i1..($min1-1)] : @$seq2[$i2..($min2-1)]);
+  ##-- trailing context: shared
+  push(@$seq3,
+       map {
+	 (($dump_aux1 && exists($aux1->{$i1+$_}) ? @{$aux1->{$i1+$_}} : qw()),
+	  ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
+	  ($pref==1 ? $seq1->[$i1+$_] : qw()),
+	  ($pref==2 ? $seq2->[$i2+$_] : qw()))
+       } (0..($#$seq1-$i1-1)));
 
   return wantarray ? @$seq3 : $seq3;
 }
@@ -378,9 +450,11 @@ sub apply {
 ##----------------------------------------------------------------------
 ## Methods: I/O: Low-Level
 
-## $mergedStr = $diff->sharedString($tok1str,$tok2str)
+## $sharedStr = $diff->sharedString($seq1i,$seq2i)
 sub sharedString {
-  my ($diff,$str1,$str2) = @_;
+  my ($diff,$i1,$i2) = @_;
+  my $str1 = $diff->{seq1}[$i1];
+  my $str2 = $diff->{seq2}[$i2];
   my @w1 = defined($str1) ? split(/[\t\n\r]/,$str1) : qw();
   my @w2 = defined($str2) ? split(/[\t\n\r]/,$str2) : qw();
   my @w12 = map {
@@ -394,7 +468,21 @@ sub sharedString {
 	? ">$w2[$_]"
 	: ''))
   } (0..($#w1 > $#w2 ? $#w1 : $#w2));
-  return '~ '.join("\t", @w12)."\n";
+  return join("\n",
+	      ($diff->{"aux1"}{$i1} ? (map {"#< $_"} @{$diff->{aux1}{$i1}}) : qw()),
+	      ($diff->{"aux2"}{$i2} ? (map {"#> $_"} @{$diff->{aux2}{$i2}}) : qw()),
+	      ('~ '.join("\t", @w12)),
+	     )."\n";
+}
+
+## $str = $diff->singleString($which,$i)
+sub singleString {
+  my ($diff,$which,$i) = @_;
+  my $chr = $which==1 ? '<' : '>';
+  return join("\n",
+	      ($diff->{"aux${which}"}{$i} ? (map {"#${chr} $_"} @{$diff->{aux}{$i}}) : qw()),
+	      ($i <= $#{$diff->{"seq${which}"}} ? ("${chr} ".$diff->{"seq${which}"}[$i]) : qw()),
+	     )."\n";
 }
 
 ##----------------------------------------------------------------------
@@ -425,13 +513,18 @@ sub saveTextFile {
 	     "%%  \@ OP MIN1,MAX1 MIN2,MAX2 :FIX? : diff hunk address (0-based), fix which or '\@'\n",
 	     "%%  < LINE1                        : (\"deleted\")  line in file1 only\n",
 	     "%%  > LINE2                        : (\"inserted\") line in file2 only\n",
+	     "%%  > LINE2                        : (\"inserted\") line in file2 only\n",
 	     "%%  ~ LINE_BOTH                    : (\"matched\")  with field prefixes)\n",
 	     "%%  = LINE_FIXED                   : (\"fixed\")    conflict resolution\n",
+	     "%%  #< AUX1                        : (\"ignored\")  diff-irrelevant line from file1\n",
+	     "%%  #> AUX2                        : (\"ignored\")  diff-irrelevant line from file2\n",
 	     (("%" x 80), "\n"),
 	    ) if ($opts{header});
 
   $fh->print("\$ file1: $diff->{file1}\n",
 	     "\$ file2: $diff->{file2}\n",
+	     "\$ auxEOS: $diff->{auxEOS}\n",
+	     "\$ auxComments: $diff->{auxComments}\n",
 	    ) if ($opts{files});
 
   ##-- dump: sequences + hunks
@@ -442,15 +535,14 @@ sub saveTextFile {
     ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
 
     ##-- dump preceding context
-    $fh->print(map { $diff->sharedString($seq1->[$i1+$_], $seq2->[$i2+$_]) } (0..($min1-$i1-1)))
-      if ($opts{shared});
+    $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($min1-$i1-1))) if ($opts{shared});
 
     ##-- dump hunk
     $addr = "\@ $op $min1,$max1 $min2,$max2";
     $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : ' :0');
     $fh->print($addr, "\n",
-	       (map {"< $_\n"} @$seq1[($min1+0)..($max1+0)]),
-	       (map {"> $_\n"} @$seq2[($min2+0)..($max2+0)]),
+	       (map {$diff->singleString(1, $_)} (($min1+0)..($max1+0))),
+	       (map {$diff->singleString(2, $_)} (($min2+0)..($max2+0))),
 	       (ref($fix) ? (map {"= $_\n"} @$fix) : qw()),
 	      );
 
@@ -458,8 +550,8 @@ sub saveTextFile {
     ($i1,$i2) = ($max1+1,$max2+1);
   }
   ##-- dump trailing context
-  $fh->print(map { $diff->sharedString($seq1->[$i1+$_], $seq2->[$i2+$_]) } (0..($#$seq1-$i1-1)))
-    if ($opts{shared});
+  $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($#$seq1-$i1-1)))  if ($opts{shared});
+
   $fh->close() if (!ref($file));
   return $diff;
 }
@@ -477,7 +569,9 @@ sub loadTextFile {
   @{$diff->{hunks}} = qw();
   @{$diff->{seq1}}  = qw();
   @{$diff->{seq2}}  = qw();
-  my ($hunks,$seq1,$seq2) = @$diff{qw(hunks seq1 seq2)};
+  %{$diff->{aux1}}  = qw();
+  %{$diff->{aux2}}  = qw();
+  my ($hunks,$seq1,$seq2,$aux1,$aux2) = @$diff{qw(hunks seq1 seq2 aux1 aux2)};
   my ($line, $hunk);
   my (@w1,@w2);
   while (defined($line=<$fh>)) {
@@ -504,6 +598,12 @@ sub loadTextFile {
     }
     elsif ($line =~ /^\> (.*)$/) { ##-- seq2-only item
       push(@$seq2,$1);
+    }
+    elsif ($line =~ /^\#\< (.*)$/) { ##-- seq1-aux item
+      push(@{$diff->{aux1}{scalar(@$seq1)}}, $1);
+    }
+    elsif ($line =~ /^\#\> (.*)$/) { ##-- seq2-aux item
+      push(@{$diff->{aux2}{scalar(@$seq2)}}, $1);
     }
     elsif ($line =~ /^\= (.*)$/) { ##-- fix item
       warn(ref($diff)."::loadTextFile($file): ignoring fix without current hunk: '$line'") if (!$hunk);

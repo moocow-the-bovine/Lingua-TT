@@ -22,7 +22,7 @@ our $verbose      = 1;
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our %saveargs     = (header=>1,files=>1,shared=>1);
-our %diffargs     = qw();
+our %diffargs     = (auxEOS=>1, auxComments=>1);
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -33,13 +33,15 @@ GetOptions(##-- general
 	   'version|V' => \$version,
 	   'verbose|v=i' => \$verbose,
 
-	   ##-- I/O
+	   ##-- misc
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'shared|s!' => \$saveargs{shared},
 	   'header|hdr!' => \$saveargs{header},
 	   'files|f!' => \$saveargs{files},
 	   'keep|k!'  => \$diffargs{keeptmp},
+	   'eos|E!'   => sub { $diffargs{auxEOS}=!$_[1]; },
+	   'comments|cmts|cmt|C!'   => sub { $diffargs{auxComments}=!$_[1]; },
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -90,6 +92,8 @@ tt-diff.perl - diff of TT file(s) keyed by token text
    -shared , -noshared  ##-- do/don't output shared data lines (default=do)
    -files  , -nofiles   ##-- do/don't output filenames (default=do)
    -keep   , -nokeep    ##-- do/don't keep temp files (default=don't)
+   -eos    , -noeos     ##-- do/don't treat EOS as ordinary token (default=do)
+   -cmt    , -nocmt     ##-- do/don't treat comments as ordinary tokens (default=do)
 
 =cut
 

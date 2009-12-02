@@ -14,6 +14,12 @@ MWE (other) --> ??
 ##------------------------------------------------------------------------
 ## DONE, Not yet documented
 
+MWE [(NN|NE)+] --> (text($2) "<NE")
+  - Barmer/NE Ersatzkasse/NN -- Barmer_Erstatzkasse/-(:NE)
+  - Bundesrepublik/NN Deutschland/NE -- Bundesrepublik_Deutschland/-(:NE)
+  - (negra) FC/NN Hansa/NE Rostock/NE -- FC_Hansa_Rostock/-(:NE)
+  - (negra) SV/NN Werder/NE Bremen/NE -- SV_Werder_Bremen/-(:NE)
+
 ##------------------------------------------------------------------------
 ## DONE & Documented
 
@@ -30,12 +36,6 @@ MWE [PP] --> $1
   - am/APPRART Rande/NN -- am_Rande/-(:ADV)
   - mit/APPR Hilfe/NN -- mit_Hilfe/-(:ADV)
   - auf/APPR jeden/PIAT Fall/NN -- auf_jeden_Fall/-(:ADV)
-
-MWE [NE NN] --> (text($2) "=NE")
-  - Barmer/NE Ersatzkasse/NN -- Barmer_Erstatzkasse/-(:NE)
-
-MWE [NN NE] --> (text($2) "=NE")
-  - Bundesrepublik/NN Deutschland/NE -- Bundesrepublik_Deutschland/-(:NE)
 
 MWE [NN ART NN] --> (text($2) "=NN")
   - Akademie/NN der/ART Wissenschaften/NN -- Akademie_der_Wissenschaften/-(:NE) !!! (later) x-impossible error!
