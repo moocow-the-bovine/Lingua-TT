@@ -140,9 +140,9 @@ while (1) {
   last if (!$s1 && !$s2);
 
   ##-- sanity check: sentence length
-  $s1->rmNonVanilla;
-  $s2->rmNonVanilla;
-  error("sentence-length mismatch (", scalar(@$s1), "/", scalar(@$s2), ")") if ($#$s1 != $#$s2);
+  $s1->rmNonVanilla if (defined($s1));
+  $s2->rmNonVanilla if (defined($s2));
+  error("sentence-length mismatch (", scalar(@{$s1||[]}), "/", scalar(@{$s2||[]}), ")") if ($#{$s1||[]} != $#{$s2||[]});
 
   ##-- construct pseudo-sentence
   @$sboth = qw();
@@ -208,7 +208,7 @@ tt-join.perl - join .tt format corpus files
    FIELDSPEC  ::= [FILENUM "."] FIELDNUM | <constant-string>
    FILENUM    ::= "1" | "2"
    FIELDNUM   ::= "*" | INDEX | RANGE
-   INDEX      ::= <positive-integer>          ##-- offset from start (>1)
+   INDEX      ::= <positive-integer>          ##-- offset from start (>=1)
                   | <negative-integer>        ##-- offset from end (<0)
    RANGE      ::= INDEX ":" INDEX             ##-- inclusive
 
