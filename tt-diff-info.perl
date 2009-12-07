@@ -21,6 +21,7 @@ our $verbose      = 1;
 
 our $outfile      = '-';
 our %diffargs     = qw();
+our $showFixes    = 1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -33,6 +34,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
+	   'fixes|fix!' => \$showFixes,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -89,14 +91,29 @@ foreach $dfile (@ARGV) {
   my $nnofix1 = $nbad1-$nfix1;
   my $nnofix2 = $nbad2-$nfix2;
 
+  ##-- counts: fixes
+  my %fix1=qw();
+  my %fix2=qw();
+  if ($showFixes) {
+    $fix2{$_->[6]} += ($_->[4]-$_->[3]+1) foreach (grep {$_->[5] && defined($_->[6])} @$hunks);
+    $fix1{$_->[6]} += ($_->[2]-$_->[1]+1) foreach (grep {$_->[5] && defined($_->[6])} @$hunks);
+  }
+
   ##-- formatting stuff
   my $llen  = 14;
+  if ($showFixes) {
+    foreach (keys(%fix1)) {
+      $llen = length($_) if (length($_) > $llen);
+    }
+    $llen += 6;
+  }
   my $ilen1 = length($nseq1);
   my $ilen2 = length($nseq2);
   my $flen  = 5;
   my $npad  = 5;
   ##
   my $clen1 = length($file1) > ($ilen1+$flen+$npad) ? length($file1) : ($ilen1+$flen+$npad);
+
   my $clen2 = length($file2) > ($ilen2+$flen+$npad) ? length($file2) : ($ilen2+$flen+$npad);
   ##
   my $lfmt  = '%'.(-$llen).'s';
@@ -113,7 +130,7 @@ foreach $dfile (@ARGV) {
   my $iffmt1 = $ifmt1.' '.$ffmt.' | '.sprintf("%${ilen2}s  %${flen}s   ",'-','-');
   my $iffmt2 = sprintf("%${ilen1}s  %${flen}s   ",'-','-').' | '.$ifmt2.' '.$ffmt;
 
-  ##-- report
+  ##-- report: basic data
   $outfh->print(#"DIFF: $dfile\n",
 		sprintf("$lfmt: %s\n", 'Diff', $dfile),
 		sprintf("$lfmt: $sfmt1 | $sfmt2\n", ' + Files', $file1, $file2),
@@ -124,6 +141,9 @@ foreach $dfile (@ARGV) {
 		sprintf("$lfmt: $iffmt2\n", '     ~ INSERT', $nins, pct($nins,$nseq2)),
 		sprintf("$lfmt: $iffmt\n",  '     ~ CHANGE', $nchg1, pct($nchg1,$nseq1), $nchg2, pct($nchg2,$nseq2)),
 		sprintf("$lfmt: $iffmt\n",  ' + Fixed', $nfix1, pct($nfix1,$nbad1), $nfix2, pct($nfix2,$nbad2)),
+		(map {
+		  sprintf("$lfmt: $iffmt\n",  ('   - '.$_), $fix1{$_}, pct($fix1{$_},$nbad1), $fix2{$_}, pct($fix2{$_},$nbad2)),
+		} sort(keys(%fix1))),
 		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix1, pct($nnofix1,$nbad2), $nnofix2, pct($nnofix2,$nbad2)),
 	       );
 }

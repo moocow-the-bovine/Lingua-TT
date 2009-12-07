@@ -20,9 +20,8 @@ our $progname     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
-our %ioargs       = (encoding=>'UTF-8');
-our %saveargs     = (shared=>1, context=>undef, syntax=>1);
-our %diffargs     = (auxEOS=>1, auxComments=>1);
+our %diffargs     = qw();
+our %saveargs     = ( syntax=>1,context=>-1 );
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -33,20 +32,15 @@ GetOptions(##-- general
 	   'version|V' => \$version,
 	   'verbose|v=i' => \$verbose,
 
-	   ##-- misc
+	   ##-- I/O
+	   #'encoding|e=s' => \$ioargs{encoding},
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$ioargs{encoding},
-	   'shared|s!' => \$saveargs{shared},
-	   'keep|K!'  => \$diffargs{keeptmp},
-	   'eos|E!'   => sub { $diffargs{auxEOS}=!$_[1]; },
-	   'comments|cmts|cmt|C!'   => sub { $diffargs{auxComments}=!$_[1]; },
 	   'context|c|k=i' => \$saveargs{context},
-	   'syntax|S!' => \$saveargs{syntax},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
-pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
+#pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
 if ($version || $verbose >= 2) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
@@ -56,13 +50,15 @@ if ($version || $verbose >= 2) {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-our ($file1,$file2) = @ARGV;
-our $diff = Lingua::TT::Diff->new(%diffargs);
-$diff->compare($file1,$file2, %ioargs)
-  or die("$0: diff->compare() failed: $!");
-$diff->saveTextFile($outfile, %saveargs)
-  or die("$0: diff->saveTextFile() failed for '$outfile': $!");
+push(@ARGV,'-') if (!@ARGV);
 
+our $diff = Lingua::TT::Diff->new(%diffargs);
+our $dfile = shift(@ARGV);
+$diff->loadTextFile($dfile)
+  or die("$0: load failed from '$dfile': $!");
+
+$diff->saveTextFile($outfile,%saveargs)
+  or die("$0: save failed to '$outfile': $!");
 
 __END__
 
@@ -74,11 +70,11 @@ __END__
 
 =head1 NAME
 
-tt-diff.perl - diff of TT file(s) keyed by token text
+tt-diff-convert.perl - convert a Lingua::TT::Diff
 
 =head1 SYNOPSIS
 
- tt-diff.perl OPTIONS [TTFILE(s)]
+ tt-diff-convert.perl OPTIONS [TT_DIFF_FILE]
 
  General Options:
    -help
@@ -87,13 +83,7 @@ tt-diff.perl - diff of TT file(s) keyed by token text
 
  Other Options:
    -output FILE         ##-- output file (default: STDOUT)
-   -encoding ENC        ##-- input encoding (default: UTF-8) [output is always UTF-8]
-   -header , -noheader  ##-- do/don't output header comments (default=do)
-   -shared , -noshared  ##-- do/don't output shared data lines (default=do)
-   -files  , -nofiles   ##-- do/don't output filenames (default=do)
-   -keep   , -nokeep    ##-- do/don't keep temp files (default=don't)
-   -eos    , -noeos     ##-- do/don't treat EOS as ordinary token (default=do)
-   -cmt    , -nocmt     ##-- do/don't treat comments as ordinary tokens (default=do)
+   -context N           ##-- save N lines of context
 
 =cut
 
