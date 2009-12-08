@@ -68,7 +68,7 @@ our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
   or die("$0: open failed for output file '$outfile': $!");
 our $outfh = $ttout->{fh};
 
-our $last_was_eos = 0;
+our $last_was_eos = 1;
 my ($infh,$line);
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)

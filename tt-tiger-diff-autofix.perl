@@ -21,6 +21,7 @@ our $verbose      = 1;
 
 our $outfile      = '-';
 our %diffargs     = qw();
+our $fix_all = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -33,6 +34,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
+	   'all|force!' => \$fix_all,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -57,6 +59,35 @@ sub hunk_max1 {
 ##   + not suitable for range
 sub hunk_max2 {
   return $_->[4] > $_->[3] ? $_->[4] : $_->[3];
+}
+
+##--------------------------------------------------------------
+## Subs: force-fix hunks
+
+## \@fix = makefix(\@items1,\@items2, $which)
+## \@fix = makefix(\@items1,\@items2, $which, ?$othertag)
+##   + non-empty tokens only!
+sub makefix {
+  my ($items1,$items2,$which,$otag) = @_;
+  $which = 1 if (!defined($which));
+
+  my ($text,$tag,@ans);
+  if ($which==1) {
+    return [
+	    map {
+	      ($text,$tag)=split(/\t/,$_);
+	      join("\t", "~$text", "<$tag", ($otag ? ">$otag" : qw()))
+	    } @$items1
+	   ];
+  }
+  return [
+	  map {
+	    ($text,@ans)=split(/\t/,$_);
+	    join("\t",
+		 "~$text",
+		 ($otag ? ("<$otag",map {">$_"} @ans) : ("~$ans[0]",map {">$_"} @ans[1..$#ans])))
+	  } @$items2
+	 ];
 }
 
 ##----------------------------------------------------------------------
@@ -131,7 +162,8 @@ foreach $hunk (@$hunks) {
 	&& @items1==(grep {/^[[:punct:]]+\t/} @items1)
 	&& @items2==(grep {/^[[:punct:]]+(?:\t|$)/} @items2))
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2, 1,'$?');
       $hunk->[6] = 'H:ellipsis1';
     }
   ##-- CHANGE: Numeric Grouping: $1 ~ ((%%*|CARD)+) & $2 ~ (*/CARD) -> $2
@@ -142,7 +174,8 @@ foreach $hunk (@$hunks) {
     {
       $item2 = $items2[0];
       $item2 =~ s/\t.*//;
-      $hunk->[5] = [(grep {/^\%\%/} @items1), "$item2\tCARD"];
+      #$hunk->[5] = [(grep {/^\%\%/} @items1), "$item2\tCARD"];
+      $hunk->[5] = makefix(\@items1,\@items2, 2,'CARD');
       $hunk->[6] = 'H:numGroup';
     }
   ##-- CHANGE: Dates: $1 ~ (... (NN|CARD)) & $2 ~ DATE -> text($2).("<" tag($1)).(">" analyses($2))
@@ -177,7 +210,8 @@ foreach $hunk (@$hunks) {
 	 && @items2==1
 	 && $items2[0] =~ /\t\$ABBREV/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:Abbr';
     }
   ##-- CHANGE: Numeric breaks: $1 ~ (*[[:digit:]]*/*) & $2 ~ (...) -> $1
@@ -185,7 +219,8 @@ foreach $hunk (@$hunks) {
 	 && @items1==1
 	 && $items1[0] =~ /^[^\t]*\d/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:numSep';
     }
   ##-- CHANGE: Punctuation breaks: $1 ~ (*[[:punct:]]*/*) & $2 ~ (...) -> $1
@@ -193,7 +228,8 @@ foreach $hunk (@$hunks) {
 	 && @items1==1
 	 && $items1[0] =~ /^[^\t]*[[:punct:]]/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:punctSep';
     }
   ##-- CHANGE: Punctuation non-breaks: $1 ~ (*/* */\'\w+) & $2 ~ (...) --> $1
@@ -202,7 +238,8 @@ foreach $hunk (@$hunks) {
 	 && $items1[1] =~ /^\'\w+\t/
 	 && @items2==1)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:punctGroup';
     }
   ##-- CHANGE: MWE (NE)+: $1 ~ (*/NE)+ & $2 ~ (*_*/-) -> text($2) "<NE"
@@ -287,7 +324,8 @@ foreach $hunk (@$hunks) {
 	 && @items2==1
 	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:MWE/(NN KON NN)';
     }
   ##-- CHANGE: MWE (ADV KON ADV): $1 ~ (*/ADV */KON */ADV) & $2 ~ (*_*/*) --> $1
@@ -299,7 +337,8 @@ foreach $hunk (@$hunks) {
 	 && @items2==1
 	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:MWE/(ADV KON ADV)';
     }
   ##-- CHANGE: MWE (PP): $1 ~ (*/(APPR*) ...) & $2 ~ (*_*/*) --> $1
@@ -309,9 +348,15 @@ foreach $hunk (@$hunks) {
 	 && @items2==1
 	 && $items2[0] =~ /^[[:alpha:]\-]+\_[[:alpha:]\_\-]+$/)
     {
-      $hunk->[5] = 1;
+      #$hunk->[5] = 1;
+      $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:MWE/PP';
     }
+  ##-- MISC: force pseudo-$1
+  elsif ($fix_all) {
+    $hunk->[5] = makefix(\@items1,\@items2,1);
+    $hunk->[6] = 'H:force';
+  }
 }
 
 
