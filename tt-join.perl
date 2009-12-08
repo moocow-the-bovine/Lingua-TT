@@ -11,7 +11,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 ##-- program vars
 our $progname     = basename($0);
@@ -20,6 +20,9 @@ our $verbose      = 0;
 
 our $format = '1.*,/,2.*';
 our $encoding = 'UTF-8'; ##-- default encoding
+
+our $wantComments1 = 1;
+our $wantComments2 = 1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -34,6 +37,9 @@ GetOptions(##-- general
 	   'format|fmt|f=s' => \$format,
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
+	   'comments1|cmts1|c1!' => \$wantComments1,
+	   'comments2|cmts2|c2!' => \$wantComments2,
+	   'comments|c!' => sub { $wantComments1=$wantComments2=$_[1]; },
 	  );
 
 pod2usage({-exitval=>1,-verbose=>0,-msg=>'Not enough arguments specified!'}) if (@ARGV < 1);
@@ -132,17 +138,35 @@ $cw  = Lingua::TT::IO->toFile($outfile, %ioargs)
   or die("$progname: Lingua::TT::IO->toFile($outfile) failed: $!");
 
 $sboth = bless([],'Lingua::TT::Sentence');
+our $s0 = bless([],'Lingua::TT::Sentence');
 
 my ($fspec,$tokboth);
 while (1) {
   $s1 = $cr1->getSentence;
   $s2 = $cr2->getSentence;
   last if (!$s1 && !$s2);
+  $s1 ||= $s0;
+  $s2 ||= $s0;
+
+  ##-- extract comments (indexed by vanilla index)
+  @cmts = qw();
+  for ($i=0; $i<=$#$s1; ++$i) {
+    if ($i<=$#$s1 && $s1->[$i][0] =~ /^%%/) {
+      $cmt = splice(@$s1,$i,1);
+      push(@{$cmts[$i]}, $cmt) if ($wantComments1);
+      --$i;
+    }
+  }
+  for ($i=0; $i<=$#$s2; ++$i) {
+    if ($s2->[$i][0] =~ /^%%/) {
+      $cmt = splice(@$s2,$i,1);
+      push(@{$cmts[$i]}, $cmt) if ($wantComments2);
+      --$i;
+    }
+  }
 
   ##-- sanity check: sentence length
-  $s1->rmNonVanilla if (defined($s1));
-  $s2->rmNonVanilla if (defined($s2));
-  error("sentence-length mismatch (", scalar(@{$s1||[]}), "/", scalar(@{$s2||[]}), ")") if ($#{$s1||[]} != $#{$s2||[]});
+  error("sentence-length mismatch (", scalar(@$s1), "/", scalar(@$s2), ")") if (@$s1 != @$s2);
 
   ##-- construct pseudo-sentence
   @$sboth = qw();
@@ -167,6 +191,11 @@ while (1) {
     }
 
     push(@$sboth,$tokboth);
+  }
+
+  ##-- splice comments back in
+  foreach $i (reverse grep {defined($cmts[$_])} (0..$#cmts)) {
+    splice(@$sboth,$i,0,@{$cmts[$i]});
   }
 
   ##-- output
