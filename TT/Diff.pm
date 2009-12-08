@@ -440,7 +440,7 @@ sub apply {
 	  ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
 	  ($pref==1 ? $seq1->[$i1+$_] : qw()),
 	  ($pref==2 ? $seq2->[$i2+$_] : qw()))
-       } (0..($#$seq1-$i1-1)));
+       } (0..($#$seq1-$i1)));
 
   return wantarray ? @$seq3 : $seq3;
 }
@@ -593,7 +593,7 @@ sub saveTextFile {
 
   ##-- dump trailing context (full dump only)
   if ($k<0) {
-    $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($#$seq1-$i1-1)));
+    $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($#$seq1-$i1)));
   } else {
     ##-- final trailing separator
     $fh->print("********\n");
@@ -633,7 +633,11 @@ sub loadTextFile {
       {
 	##-- hunk address
 	($i1,$i2) = ($2+0,$3+0) if (defined($2) && defined($3));
-	push(@$hunks, $hunk=[$1, (map {$_+0} ($4,$5,$6,$7)), (defined($8) && $8 ne '?' ? $8 : qw()), (defined($9) ? $9 : qw())]);
+	push(@$hunks, $hunk=[$1,
+			     (map {$_+0} ($4,$5,$6,$7)),
+			     (defined($8) && $8 ne '?' ? $8 : '0'),
+			     (defined($9) ? $9 : qw())]);
+	$hunk->[5] = [] if ($hunk->[5] && $hunk->[5] eq '@');
       }
     elsif ($line =~ /^~ /)
       {
