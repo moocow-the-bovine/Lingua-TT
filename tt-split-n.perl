@@ -93,8 +93,9 @@ $doc->shuffle(seed=>$seed);
 our @odocs = $doc->splitN($nsplits);
 
 ##-- output
-$outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.\d*)d/);
+$outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.\d*)?d/);
 our @ofiles = map {sprintf($outfmt,$_)} (0..$#odocs);
+#print STDERR "$0: outfmt='$outfmt', ofiles=(", join(' ', map {"'$_'"} @ofiles), ")\n"; ##-- DEBUG
 foreach $oi (0..$#odocs) {
   $ttout = Lingua::TT::IO->toFile($ofiles[$oi],%ioargs)
     or die("$0: open failed for output file '$ofiles[$oi]': $!");
