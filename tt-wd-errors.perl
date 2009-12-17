@@ -81,7 +81,7 @@ foreach $infile (@ARGV) {
     next if (/^\s*$/ || /^\s*\%\%/);
 
     ($text,$tag,@ans0) = split(/\t/,$_);
-    @ans = map { /\[\_?([^\]\s]+)\]/ ? $1 : $_ } @ans0;
+    @ans = map { /^[^\[]*\[\_?([^\]\s]+)[\]\s]/ ? $1 : $_ } @ans0;
     %ans = map {($_=>undef)} @ans;
     $cls = '{'.join(' ',sort keys %ans).'}';
     $tc  = "$tag $cls";
