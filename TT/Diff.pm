@@ -397,14 +397,27 @@ sub apply {
   foreach $hunk (@$hunks) {
     ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
 
-    ##-- context: shared
-    push(@$seq3,
-	 map {
-	   (($dump_aux1 && exists($aux1->{$i1+$_}) ? @{$aux1->{$i1+$_}} : qw()),
-	    ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
-	    ($pref==1 ? $seq1->[$i1+$_] : qw()),
-	    ($pref==2 ? $seq2->[$i2+$_] : qw()))
-	 } (0..($min1-$i1-1)));
+    ##-- leading context: shared
+    if (0) {
+      ##-- ORIG
+      push(@$seq3,
+	   map {
+	     (($dump_aux1 && exists($aux1->{$i1+$_}) ? @{$aux1->{$i1+$_}} : qw()),
+	      ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
+	      ($pref==1 ? $seq1->[$i1+$_] : qw()),
+	      ($pref==2 ? $seq2->[$i2+$_] : qw()))
+	   } (0..($min1-$i1-1)));
+    } else {
+      ##-- DEBUG
+      foreach (0..($min1-$i1-1)) {
+	push(@$seq3,
+	     (($dump_aux1 && exists($aux1->{$i1+$_}) ? @{$aux1->{$i1+$_}} : qw()),
+	      ($dump_aux2 && exists($aux2->{$i2+$_}) ? @{$aux2->{$i2+$_}} : qw()),
+	      ($pref==1 ? $seq1->[$i1+$_] : qw()),
+	      ($pref==2 ? $seq2->[$i2+$_] : qw()))
+	    );
+      }
+    }
 
     ##-- current item (hunk-internal)
     if (!$pfix || !ref($fix)) {
@@ -427,8 +440,8 @@ sub apply {
 	 } (0..$hmax));
 
     ##-- update current position counters (with safety checks for hacked diffs)
-    $max1 = $min1 if ($min1>$max1);
-    $max2 = $min2 if ($min2>$max2);
+    #$max1 = $min1 if ($min1>$max1); ##-- BAD for 'a' ("add") ops: see notes.fix
+    #$max2 = $min2 if ($min2>$max2); ##-- (?)BAD for 'd' ("del") ops: see notes.fix
     $i1 = $max1+1 if ($max1 >= $i1);
     $i2 = $max2+1 if ($max2 >= $i2);
   }
@@ -444,6 +457,16 @@ sub apply {
 
   return wantarray ? @$seq3 : $seq3;
 }
+
+##-- DEBUG
+sub _strtext {
+  my $str = shift;
+  $str =~ s/\t.*$//;
+  return $str;
+}
+sub bugstr { my $s=shift; $s=~s/\t/ /g; return '"'.$s.'"'; }
+sub bugline { my ($i,$i1,$i2,$seq1,$seq2) = @_; return sprintf("	  %3d  %d  %d  %-24s %s", $i, $i1+$i, $i2+$i, bugstr($seq1->[$i1+$i]), bugstr($seq2->[$i2+$i])); }
+
 
 ##==============================================================================
 ## Methods: I/O
