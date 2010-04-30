@@ -36,6 +36,7 @@ our $DIFF = 'diff'; ##-- search in path
 ##   aux2 => \%aux2,       ##-- aux data: ($seq2i=>\@auxLinesBeforeSeq2i)
 ##   auxEOS  => $bool,     ##-- if true, EOS lines will be considered "aux" data (default=false)
 ##   auxComments => $bool, ##-- if true, comment lines will be considered "aux" data (default=false)
+##   diffopts => $opts,    ##-- options passed to diff (string)
 ##   ##
 ##   ##-- misc options
 ##   keeptmp => $bool,    ##-- if true, temp files will not be unlinked (default=false)
@@ -71,6 +72,7 @@ sub new {
 		    aux2 => {},
 		    auxEOS => 0,
 		    auxComments => 0,
+		    diffopts => '',
 
 		    ##-- cache data
 		    keeptmp  => 0,
@@ -303,7 +305,7 @@ sub compare {
   my $file2 = $diff->seqTempFile(2);
 
   ##-- compute & parse the diff (external call)
-  my $fh = IO::File->new("$DIFF $file1 $file2|")
+  my $fh = IO::File->new("$DIFF $diff->{diffopts} $file1 $file2|")
     or die(ref($diff)."::compare(): could not open pipe from system diff '$DIFF': $!");
   binmode($fh,':utf8');
   my ($op,$min1,$min2,$max1,$max2) = ('',0,0,0,0);

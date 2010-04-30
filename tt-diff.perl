@@ -22,7 +22,7 @@ our $verbose      = 1;
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our %saveargs     = (shared=>1, context=>undef, syntax=>1);
-our %diffargs     = (auxEOS=>1, auxComments=>1);
+our %diffargs     = (auxEOS=>1, auxComments=>1, diffopts=>'');
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -42,6 +42,8 @@ GetOptions(##-- general
 	   'comments|cmts|cmt|C!'   => sub { $diffargs{auxComments}=!$_[1]; },
 	   'context|c|k=i' => \$saveargs{context},
 	   'syntax|S!' => \$saveargs{syntax},
+	   'diff-options|D' => \$diffargs{diffopts},
+	   'minimal|d' => sub { $diffargs{diffopts} .= ' -d'; },
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -88,6 +90,8 @@ tt-diff.perl - diff of TT file(s) keyed by token text
  Other Options:
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENC        ##-- input encoding (default: UTF-8) [output is always UTF-8]
+   -D DIFF_OPTIONS      ##-- pass DIFF_OPTIONS to GNU diff
+   -minimal             ##-- alias for -D='-d'
    -header , -noheader  ##-- do/don't output header comments (default=do)
    -shared , -noshared  ##-- do/don't output shared data lines (default=do)
    -files  , -nofiles   ##-- do/don't output filenames (default=do)
