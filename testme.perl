@@ -36,7 +36,7 @@ sub test_doc {
   my $doc  = Lingua::TT::Document->newFromString($str1.$str2);
   print STDERR "$0: test_doc() done: what now?\n";
 }
-test_doc();
+#test_doc();
 
 ##----------------------------------------------------------------------
 sub test_io {
@@ -120,7 +120,186 @@ sub test_tt_diff {
 
   print STDERR "$0: test_tt_diff() done: what now?\n";
 }
-test_tt_diff(@ARGV);
+#test_tt_diff(@ARGV);
+
+##----------------------------------------------------------------------
+use DB_File;
+use Fcntl;
+sub test_db_recno {
+  my $ttfile = @_ ? shift : 'test1.t';
+  my (@recs);
+  my $rt = tie(@recs, 'DB_File', $ttfile, O_RDONLY, 0644, $DB_RECNO)
+    or die("$0: tie() failed for $ttfile: $!");
+  foreach (@recs) {
+    print $_, "\n";
+  }
+  ##-- cleanup
+  undef $rt;
+  untie @recs;
+}
+#test_db_recno(@ARGV);
+
+##----------------------------------------------------------------------
+use Lingua::TT::DB::Enum;
+sub test_db_enum_0 {
+  my $efile = @_ ? shift : 'enum';
+  my $dbe = Lingua::TT::DB::Enum->new(file=>$efile);
+
+  my $i1 = $dbe->getId('foo');
+  my $i2 = $dbe->getId('bar');
+  my $i3 = $dbe->getId('baz');
+
+  my $s1 = $dbe->getSym($i1);
+  my $s2 = $dbe->getSym($i2);
+  my $s3 = $dbe->getSym($i3);
+
+  $dbe->close();
+}
+#test_db_enum(@ARGV);
+
+sub test_db_enum_create {
+  my $which = @_ ? shift : '_HR';
+  #my $which = '';
+  my $tfile = @_ ? shift : 'tiger.utf8.orig.t';
+  my $efile = @_ ? shift : "enum${which}";
+
+  my $io = Lingua::TT::IO->open('<',$tfile)
+    or die("open failed for '$tfile': $!");
+  require "Lingua/TT/DB/Enum${which}.pm";
+  my $dbe = "Lingua::TT::DB::Enum${which}"->new(file=>$efile, flags=>(O_RDWR|O_CREAT|O_TRUNC))
+    or die("open failed for '$efile': $!");
+  $dbe->clear();
+
+  my $fh = $io->{fh};
+  my ($text);
+  while (defined($text=<$fh>)) {
+    chomp($text);
+    $text =~ s/\t.*$//;
+    next if ($text eq '' || $text =~ /^\%\%/);
+    $dbe->getId($text) if (!exists($dbe->{sym2id}{$text}));
+  }
+  $dbe->close;
+  $fh->close;
+  $io->close;
+  exit 0;
+}
+#test_db_enum_create(@ARGV);
+
+sub test_db_enum_apply {
+  my $which = @_ ? shift : '_HH'; #'_HR';
+  #my $which = '';
+  my $tfile = @_ ? shift : 'tiger.utf8.orig.t';
+  my $efile = @_ ? shift : "enum${which}";
+  my $ofile = @_ ? shift : "out${which}.t";
+
+  my $io = Lingua::TT::IO->open('<',$tfile)
+    or die("open failed for '$tfile': $!");
+  require "Lingua/TT/DB/Enum${which}.pm";
+  my $dbe = "Lingua::TT::DB::Enum${which}"->new(file=>$efile, flags=>(O_RDWR|O_CREAT)) #|O_TRUNC
+    or die("open failed for '$efile': $!");
+  #$dbe->clear();
+  my $outfh = IO::File->new(">$ofile") or die("$0: open failed for '$ofile': $!");
+  $outfh->binmode(':utf8');
+
+  my $infh = $io->{fh};
+  my ($text,$id);
+  while (defined($text=<$infh>)) {
+    chomp($text);
+    $text =~ s/\t.*$//;
+    if ($text eq '' || $text =~ /^\%\%/) {
+      $outfh->print($text,"\n");
+      next;
+    }
+    $id = $dbe->{sym2id}{$text};
+    $outfh->print($id,"\t",$text,"\n");
+  }
+  $dbe->close;
+  $infh->close;
+  $outfh->close;
+  $io->close;
+  exit 0;
+}
+#test_db_enum_apply(@ARGV);
+
+sub test_db_enum_apply2 {
+  my $which = @_ ? shift : '_HH'; #'_HR';
+  #my $which = '';
+  my $tfile = @_ ? shift : 'tiger.utf8.orig.t';
+  my $efile = @_ ? shift : "enum${which}";
+  my $ofile = @_ ? shift : "out2${which}.t";
+
+  my $io = Lingua::TT::IO->open('<',$tfile)
+    or die("open failed for '$tfile': $!");
+  require "Lingua/TT/DB/Enum${which}.pm";
+  my $dbe = "Lingua::TT::DB::Enum${which}"->new(file=>$efile, flags=>(O_RDWR|O_CREAT)) #|O_TRUNC
+    or die("open failed for '$efile': $!");
+  #$dbe->clear();
+  my $outfh = IO::File->new(">$ofile") or die("$0: open failed for '$ofile': $!");
+  $outfh->binmode(':utf8');
+
+  my $infh = $io->{fh};
+  my ($text,$id,$text2);
+  while (defined($text=<$infh>)) {
+    chomp($text);
+    $text =~ s/\t.*$//;
+    if ($text eq '' || $text =~ /^\%\%/) {
+      $outfh->print($text,"\n");
+      next;
+    }
+    $id    = $dbe->{sym2id}{$text};
+    $text2 = (ref($dbe->{id2sym}) eq 'ARRAY'
+	      ? $dbe->{id2sym}[$id]
+	      : $dbe->{id2sym}{$id});
+    $outfh->print($id,"\t",$text2,"\n");
+  }
+  $dbe->close;
+  $infh->close;
+  $outfh->close;
+  $io->close;
+  exit 0;
+}
+#test_db_enum_apply2(@ARGV);
+
+
+##----------------------------------------------------------------------
+use Lingua::TT::Enum;
+sub test_enum {
+  my $enum = Lingua::TT::Enum->new();
+
+  my $i1 = $enum->getId('foo');
+  my $i2 = $enum->getId('bar');
+  my $i3 = $enum->getId('baz');
+  my $i4 = $enum->getId("\x{17f}oobar");
+
+  my $s1 = $enum->getSym($i1);
+  my $s2 = $enum->getSym($i2);
+  my $s3 = $enum->getSym($i3);
+  my $s4 = $enum->getSym($i4);
+
+  my $estr = '';
+  $enum->saveString(\$estr);
+  $enum->saveFile('enum.dat');
+  print STDERR "test_enum(): done\n";
+}
+#test_enum();
+
+##----------------------------------------------------------------------
+use Lingua::TT::DB::File::PackedArray;
+sub test_packedarray {
+  my $af = @_ ? shift : 'pa.db';
+
+  my $pa = Lingua::TT::DB::File::PackedArray->new(packfmt=>'L',file=>$af,flags=>O_RDWR|O_CREAT|O_TRUNC);
+  my @vals = map {[$_]} qw(1 2 3 42);
+  $pa->ppush(@$_) foreach (@vals);
+  $pa->close;
+
+  ##-- re-open
+  $pa->open($af,flags=>O_RDONLY);
+  my @ovals = map {$pa->rget($_)} (0..$#{$pa->{data}});
+
+  print STDERR "test_packedarray: done()";
+}
+#test_packedarray(@ARGV);
 
 ##======================================================================
 ## MAIN (dummy)
