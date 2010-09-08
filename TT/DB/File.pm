@@ -91,16 +91,18 @@ sub close {
 
 ## $dbf = $dbf->open($file,%opts)
 ##  + %opts are as for new()
+##  + $file defaults to $dbf->{file}
 sub open {
   my ($dbf,$file,%opts) = @_;
   $dbf->close() if ($dbf->opened);
-  $dbf->{file} = $file;
   @$dbf{keys %opts} = values(%opts);
+  $file = $dbf->{file} if (!defined($file));
+  $dbf->{file} = $file;
   @{$dbf->{dbinfo}}{keys %{$dbf->{dbopts}}} = values %{$dbf->{dbopts}};
 
   ##-- truncate file here if user specified O_TRUNC, since DB_File doesn't
   if (($dbf->{flags} & O_TRUNC) && -e $dbf->{file}) {
-    unlink($dbf->{file})
+    $dbf->truncate()
       or confess(ref($dbf)."::open(O_TRUNC): could not unlink file '$dbf->{file}': $!");
   }
 
@@ -117,6 +119,17 @@ sub open {
   }
 
   return $dbf;
+}
+
+## $bool = $dbf->truncate()
+## $bool = $CLASS_OR_OBJ->truncate($file)
+##  + actually calls unlink($file)
+##  + no-op if $file and $dbf->{file} are both undef
+sub truncate {
+  my ($dbf,$file) = @_;
+  $file = $dbf->{file} if (!defined($file));
+  return if (!defined($file));
+  unlink($file);
 }
 
 ## $bool = $dbf->sync()

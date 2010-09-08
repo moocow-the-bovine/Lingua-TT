@@ -2,6 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
+use Benchmark qw(cmpthese timethese);
 use Encode qw(encode decode);
 
 ##----------------------------------------------------------------------
@@ -333,8 +334,98 @@ sub test_db_doc_put {
   print STDERR "test_db_doc(): done\n";
   exit 0;
 }
-test_db_doc_put(@ARGV);
+#test_db_doc_put(@ARGV);
 
+##----------------------------------------------------------------------
+## ($tied,\@ttlines) = db_ttrec($file)
+sub tt_dba {
+  my $ttfile = shift;
+  my @ttlines = qw();
+  my $dbinfo = DB_File::RECNOINFO->new;
+  $dbinfo->{cachesize} = 1024**3;
+  my $tied = tie(@ttlines, 'DB_File', $ttfile, O_RDWR, 0644, $dbinfo)
+    or die("$0: tt_dba(): tie() failed for $ttfile: $!");
+  return wantarray ? ($tied,\@ttlines) : \@ttlines;
+}
+
+sub bench_dbdoc_get {
+  my $ttfile = @_ ? shift : 'negra.utf8.clean.t';
+  my $dbdir  = @_ ? shift : "$ttfile.db";
+
+  ##-- data
+  my ($tied,$tta) = tt_dba($ttfile);
+  my  $dbd = Lingua::TT::DB::Document->new(dir=>$dbdir,truncate=>0,
+					   fields=>[{name=>'text',get=>'$_->[0]'},
+						    {name=>'tag', get=>'$_->[1]',packfmt=>'C'},
+						   ]);
+
+  ##-- access subs
+  my $tta_getline = sub { $tta->[$_[0]] };
+  my $dbd_getline = sub { join("\t",
+			       map {
+				 $_->{enum}{id2sym}[unpack($_->{packfmt},$_->{data}[$_[0]])]
+			       } @{$dbd->{fields}}
+			      )
+			    };
+  my $tta_gettxt = sub { (split(/\t/,$tta->[$_[0]]))[0] };
+  my $f  = $dbd->{fields}[0];
+  my $dbd_gettxt = sub { $f->{enum}{id2sym}[unpack($f->{packfmt},$f->{data}[$_[0]])] };
+
+
+  ##-- debug
+  my $tta_l0 = $tta_getline->(0);
+  my $dbd_l0 = $dbd_getline->(0);
+  my $tta_x0 = $tta_gettxt->(0);
+  my $dbd_x0 = $dbd_gettxt->(0);
+
+  ##-- test: which
+  my %test = (
+	      #'seq:line'=>1,
+	      #'seq:text'=>1,
+	      #'rand:line'=>1,
+	      'rand:text'=>1,
+	     );
+
+  my @ids = (0..$#{$dbd->{fields}[0]{data}});
+  if ($test{'seq:line'}) {
+    print STDERR "BENCH: seq: line\n";
+    cmpthese(1,{
+		'seq:tta:line' => sub { $tta_getline->($_) foreach (@ids); },
+		'seq:dbd:line' => sub { $dbd_getline->($_) foreach (@ids); },
+	       })
+  }
+  if ($test{'seq:text'}) {
+    print STDERR "BENCH: seq: text\n";
+    cmpthese(1,{
+		'seq:tta:text' => sub { $tta_gettxt->($_) foreach (@ids); },
+		'seq:dbd:text' => sub { $dbd_gettxt->($_) foreach (@ids); },
+	       });
+  }
+
+  ##-- randomize ids
+  foreach $i (0..$#ids) {
+    $j = int(rand($#ids+1));
+    @ids[$i,$j] = @ids[$j,$i];
+  }
+  if ($test{'rand:line'}) {
+    print STDERR "BENCH: rand: line\n";
+    cmpthese(1,{
+		'rand:tta:line' => sub { $tta_getline->($_) foreach (@ids); },
+		'rand:dbd:line' => sub { $dbd_getline->($_) foreach (@ids); },
+	       });
+  }
+  if ($test{'rand:text'}) {
+    print STDERR "BENCH: rand: text\n";
+    cmpthese(1,{
+		'rand:tta:text' => sub { $tta_gettxt->($_) foreach (@ids); },
+		'rand:dbd:text' => sub { $dbd_gettxt->($_) foreach (@ids); },
+	       });
+  }
+
+  print STDERR "$0: bench_dbdoc_get(): done.\n";
+  exit 0;
+}
+bench_dbdoc_get(@ARGV);
 
 ##======================================================================
 ## MAIN (dummy)

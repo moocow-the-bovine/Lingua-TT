@@ -179,6 +179,24 @@ sub datafiles {
   return ("$file.enum", "$file.db");
 }
 
+## $bool = $f->fileExists()
+## $bool = $f->fileExists($name)
+sub fileExists {
+  my ($f,$name) = @_;
+  my $file = $f->name2file($name);
+  return (-e "$file.enum" && -e "$file.db");
+}
+
+## $bool = $f->truncate()
+## $bool = $f->truncate($name)
+sub truncate {
+  my ($f,$name) = @_;
+  my $file = $f->name2file($name);
+  return ((!-e "$file.db" || unlink("$file.db"))
+	  &&
+	  (!-e "$file.enum" || CORE::truncate("$file.enum",0)));
+}
+
 ##==============================================================================
 ## Methods: I/O: TT::Persistent
 

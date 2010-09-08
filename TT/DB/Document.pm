@@ -167,31 +167,37 @@ sub open {
   ##-- load local files (only if not truncating)
   $dbdoc->loadLocalFiles if (!$dbdoc->{truncate});
 
-  ##-- open local data files
-  ##  + sents:  ARRAY: $sent_i =>  pack('L', $sent_offset_ntoks)
-  ##  + files:  ARRAY: $file_i => join("\t", $file_offset_nsents, $file_len_nsents, $filename)."\n"
-  ##  + cmts:   BTREE: $tok_i  => join("\n", @comment_lines_before_tok_i)
-  $dbdoc->{sents} = Lingua::TT::DB::File::PackedArray->new(packfmt=>'L',file=>"$dir/sents.db",flags=>$dbdoc->{flags})
-    or confess(ref($dbdoc)."::open(): open failed for '$dir/sents.db': $!");
-  $dbdoc->{docs} = Lingua::TT::DB::File::Array->new(file=>"$dir/docs.db",flags=>$dbdoc->{flags})
-    or confess(ref($dbdoc)."::open(): open failed for '$dir/docs.db': $!");
-  $dbdoc->{cmts} = Lingua::TT::DB::File::BTree->new(file=>"$dir/cmts.db",flags=>$dbdoc->{flags})
-    or confess(ref($dbdoc)."::open(): open failed for '$dir/cmts.db': $!");
+  ##-- set basic field data dir
+  @$_{qw(dir flags)} = @$dbdoc{qw(dir flags)} foreach (@{$dbdoc->{fields}});
 
-  ##-- truncate all datafiles?
+  ##-- truncate field datafiles before open?
   if ($dbdoc->{truncate}) {
     $dbdoc->{flags} |= O_TRUNC;
-    foreach ($dbdoc->datafiles) {
-      next if ($dbdoc->{nocreate} && !-e $_);
-      my $fh = IO::File->new(">$_")
-	or confess(ref($dbdoc)."::open(+truncate): failed to truncate old file '$_': $!");
-      $fh->close();
+    foreach (@{$dbdoc->{fields}}) {
+      next if ($dbdoc->{nocreate} && !$_->fileExists);
+      $_->truncate();
     }
   }
+  ##-- open local data files
+  ##  + docs:   ARRAY: $file_i => join("\t", $doc_offset_nsents, $doc_filename)."\n"
+  ##  + sents:  ARRAY: $sent_i =>  pack('L', $sent_offset_ntoks)
+  ##  + cmts:   BTREE: $tok_i  => join("\n", @comment_lines_before_tok_i)
+  $dbdoc->{docs} = Lingua::TT::DB::File::Array->new(file=>"$dir/docs.db",
+						    flags=>$dbdoc->{flags}
+						   )
+    or confess(ref($dbdoc)."::open(): open failed for '$dir/docs.db': $!");
+  $dbdoc->{sents} = Lingua::TT::DB::File::PackedArray->new(file=>"$dir/sents.db",
+							   flags=>$dbdoc->{flags},
+							   packfmt=>'L')
+    or confess(ref($dbdoc)."::open(): open failed for '$dir/sents.db': $!");
+  $dbdoc->{cmts} = Lingua::TT::DB::File::BTree->new(file=>"$dir/cmts.db",
+						    flags=>$dbdoc->{flags},
+						    dbopts=>{compare=>sub { $_[0] <=> $_[1] }},
+						   )
+    or confess(ref($dbdoc)."::open(): open failed for '$dir/cmts.db': $!");
 
   ##-- open field data files
   foreach (@{$dbdoc->{fields}}) {
-    $_->{dir} = $dbdoc->{dir};
     $_->open(flags=>$dbdoc->{flags})
       or confess(ref($dbdoc)."::open(): open failed for field name '$_->{name}': $!");
   }
@@ -199,12 +205,21 @@ sub open {
   ##-- compile field closures
   $_->compileClosures() foreach (@{$dbdoc->{fields}});
 
-  #$dbdoc->{opened} = 1;
   return $dbdoc;
 }
 
 ##==============================================================================
 ## Methods: I/O: utils
+
+## $dbdoc = $dbdoc->truncate()
+sub truncate {
+  my $dbdoc = shift;
+  my $dir = $dbdoc->{dir};
+  return if (!defined($dir));
+  CORE::truncate("$dir/config.pm",0);
+  $_->truncate() foreach (@{$dbdoc->{fields}}, @$dbdoc{qw(docs sents cmts)});
+  return $dbdoc;
+}
 
 ## $dbdoc = $dbdoc->loadLocalFiles()
 sub loadLocalFiles {
@@ -291,8 +306,11 @@ sub putToken {
   if ($_[1][0] =~ /^\s*\%\%/) {
     ##-- comment
     my $off = $_[0]->offset;
-    $_[0]{cmts}{data}{$off}  = '' if (!exists($_[0]{cmts}{data}{$off}));
-    $_[0]{cmts}{data}{$off} .= join("\t", @{$_[1]})."\n";
+    if (!exists($_[0]{cmts}{data}{$off})) {
+      $_[0]{cmts}{data}{$off} = join("\t", @{$_[1]})."\n";
+    } else {
+      $_[0]{cmts}{data}{$off} .= join("\t", @{$_[1]})."\n";
+    }
   } else {
     ##-- vanilla
     $_->putToken($_[1]) foreach (@{$_[0]{fields}});
