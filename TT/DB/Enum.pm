@@ -89,9 +89,9 @@ sub open {
   $dbe->{i2s} = Lingua::TT::DB::File->new(%{$dbe->{opts_i2s}}, file=>undef);
 
   $dbe->{s2i}->open("${file}_s2i.db")
-    or croak(ref($dbe)."::open() failed for '${file}_s2i.db': $!");
+    or confess(ref($dbe)."::open() failed for '${file}_s2i.db': $!");
   $dbe->{i2s}->open($file."_i2s.db")
-    or croak(ref($dbe)."::open() failed for '${file}_i2s.db': $!");
+    or confess(ref($dbe)."::open() failed for '${file}_i2s.db': $!");
 
   ##-- initialize local references
   $dbe->{id2sym} = $dbe->{i2s}{data};

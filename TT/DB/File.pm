@@ -5,14 +5,18 @@
 
 
 package Lingua::TT::DB::File;
+use Lingua::TT::Persistent;
 use DB_File;
 use Fcntl;
 use Carp;
 use IO::File;
+use File::Copy qw();
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
+
+our @ISA = qw(Lingua::TT::Persistent);
 
 ##==============================================================================
 ## Constructors etc.
@@ -95,27 +99,56 @@ sub open {
   @{$dbf->{dbinfo}}{keys %{$dbf->{dbopts}}} = values %{$dbf->{dbopts}};
 
   ##-- truncate file here if user specified O_TRUNC, since DB_File doesn't
-  if ($dbf->{flags} & O_TRUNC) {
-    my $fh = IO::File->new(">$dbf->{file}")
-      or croak(ref($dbf)."::open(): could not truncate file '$dbf->{file}': $!");
-    $fh->close();
+  if (($dbf->{flags} & O_TRUNC) && -e $dbf->{file}) {
+    unlink($dbf->{file})
+      or confess(ref($dbf)."::open(O_TRUNC): could not unlink file '$dbf->{file}': $!");
   }
 
   if (uc($dbf->{type}) eq 'RECNO') {
     ##-- tie: recno (array)
     $dbf->{data} = [];
     $dbf->{tied} = tie(@{$dbf->{data}}, 'DB_File', $dbf->{file}, $dbf->{flags}, $dbf->{mode}, $dbf->{dbinfo})
-      or croak(ref($dbf).": tie() failed for file '$dbf->{file}': $!");
+      or confess(ref($dbf).":open(): tie() failed for ARRAY file '$dbf->{file}': $!");
   } else {
     ##-- tie: btree or hash (hash)
     $dbf->{data} = {};
     $dbf->{tied} = tie(%{$dbf->{data}}, 'DB_File', $dbf->{file}, $dbf->{flags}, $dbf->{mode}, $dbf->{dbinfo})
-      or croak(ref($dbf).": tie() failed for file '$dbf->{file}': $!");
+      or confess(ref($dbf).":open(): tie() failed for HASH file '$dbf->{file}': $!");
   }
 
   return $dbf;
 }
 
+## $bool = $dbf->sync()
+## $bool = $dbf->sync($flags)
+sub sync {
+  my $dbf = shift;
+  return 1 if (!$dbf->opened);
+  return $dbf->{tied}->sync(@_) == 0;
+}
+
+## $bool = $dbf->copy($file2)
+## $bool = PACKAGE::copy($file1,$file2)
+##  + copies database data to $file2
+sub copy {
+  my ($dbf,$file2) = @_;
+  my $that  = ref($dbf) || __PACKAGE__;
+  my $file1 = ref($dbf) ? $dbf->{file} : $dbf;
+  confess("${that}::copy(): no source specified!") if (!defined($file1));
+  confess("${that}::copy(): no destination specified!") if (!defined($file2));
+  if (ref($dbf)) { $dbf->sync() or confess("${that}::copy(): sync failed: $!"); }
+  File::Copy::copy($file1, $file2)
+      or confess("${that}::copy() failed from '$file1' to '$file2': $!");
+  return 1;
+}
+
+##==============================================================================
+## Methods: TT::Persistent
+
+## @keys = $dbf->noSaveKeys()
+sub noSaveKeys {
+  return qw(dbinfo dbopts data tied);
+}
 
 ##==============================================================================
 ## Footer

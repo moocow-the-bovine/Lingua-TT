@@ -301,6 +301,41 @@ sub test_packedarray {
 }
 #test_packedarray(@ARGV);
 
+##----------------------------------------------------------------------
+use Lingua::TT::DB::Document;
+sub test_db_doc {
+  my $dir = 'dbdoc';
+
+  my $dbdoc = Lingua::TT::DB::Document->new(dir=>$dir,truncate=>1);
+  $dbdoc->sync();
+
+  my $str  = $dbdoc->savePerlString;
+  my $doc2 = Lingua::TT::DB::Document->loadPerlString($str);
+  $doc2->open($dir,truncate=>0,nocreate=>1);
+
+  print STDERR "test_db_doc(): done\n";
+}
+#test_db_doc();
+
+sub test_db_doc_put {
+  my $file = @_ ? shift : 'negra.utf8.tt';
+  my $dir  = @_ ? shift : "$file.db";
+
+  #my $dbdoc = Lingua::TT::DB::Document->new(dir=>$dir,truncate=>1);
+  my $dbdoc = Lingua::TT::DB::Document->new(dir=>$dir,truncate=>1,
+					    fields=>[{name=>'text',get=>'$_->[0]'},
+						     {name=>'tag', get=>'$_->[1]',packfmt=>'C'},
+						    ]);
+  my $io    = Lingua::TT::IO->fromFile($file);
+  $dbdoc->putIO($io);
+  $dbdoc->sync();
+
+  print STDERR "test_db_doc(): done\n";
+  exit 0;
+}
+test_db_doc_put(@ARGV);
+
+
 ##======================================================================
 ## MAIN (dummy)
 foreach $i (1..3) {

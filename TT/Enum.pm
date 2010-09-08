@@ -5,14 +5,14 @@
 
 
 package Lingua::TT::Enum;
-use Lingua::TT::IO;
+use Lingua::TT::Persistent;
 use Carp;
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
 
-our @ISA = qw();
+our @ISA = qw(Lingua::TT::Persistent);
 
 ##==============================================================================
 ## Constructors etc.
@@ -66,40 +66,14 @@ sub getSym {
 ##==============================================================================
 ## Methods: I/O
 
-##--------------------------------------------------------------
-## Methods: I/O: save
-
-## $bool = $enum->save($filename_or_fh,%opts)
-## + alias for $enum->saveFile()
-BEGIN {
-  *save = \&saveFile;
-}
-
-## $bool = $enum->saveFile($filename_or_fh,%opts)
-## + %opts are passed to Lingua::TT::IO::toFile()
-sub saveFile {
-  my $enum = shift;
-  my $io = Lingua::TT::IO->toFile($_[0],%{$enum->{io}},@_[1..$#_])
-    or die(ref($enum)."::saveFile(): could not open file '$_[0]': $!");
-  return $enum->saveIO($io);
-}
-
-## \$str = $enum->saveString(\$string,%opts)
-## + %opts are passed to Lingua::TT::IO::toString()
-sub saveString {
-  my $enum = shift;
-  my $io = Lingua::TT::IO->toString($_[0],%{$enum->{io}},@_[1..$#_])
-    or die(ref($enum)."::saveString(): could not open string '$_[0]': $!");
-  return $enum->saveIO($io);
-}
-
-## $bool = $enum->saveIO($io)
-## + saves to Lingua::TT::IO object
-sub saveIO {
-  my ($enum,$io) = @_;
+## $bool = $enum->saveNativeFh($fh)
+## + saves to filehandle
+## + implicitly sets $fh ':utf8' flag
+sub saveNativeFh {
+  my ($enum,$fh) = @_;
+  $fh->binmode(':utf8');
   my ($sym,$id);
   my $id2sym = $enum->{id2sym};
-  my $fh = $io->{fh};
   for ($id=0; $id < $enum->{size}; $id++) {
     next if (!exists($id2sym->[$id]));
     $fh->print($id,"\t",$id2sym->[$id],"\n");
@@ -107,40 +81,14 @@ sub saveIO {
   return $enum;
 }
 
-##--------------------------------------------------------------
-## Methods: I/O: load
-
-## $bool = $enum->load($filename_or_fh,%opts)
-## + alias for $enum->loadFile()
-BEGIN {
-  *load = \&loadFile;
-}
-
-## $bool = $enum->loadFile($filename_or_fh,%opts)
-## + %opts are passed to Lingua::TT::IO::toFile()
-sub loadFile {
-  my $enum = shift;
-  my $io = Lingua::TT::IO->fromFile($_[0],%{$enum->{io}},@_[1..$#_])
-    or die(ref($enum)."::loadFile(): could not open file '$_[0]': $!");
-  return $enum->loadIO($io);
-}
-
-## $bool = $enum->loadString(\$string,%opts)
-## + %opts are passed to Lingua::TT::IO::toString()
-sub loadString {
-  my $enum = shift;
-  my $io = Lingua::TT::IO->loadString($_[0],%{$enum->{io}},@_[1..$#_])
-    or die(ref($enum)."::loadString(): could not open string '$_[0]': $!");
-  return $enum->loadIO($io);
-}
-
-## $bool = $enum->loadIO($io)
-## + loads from Lingua::TT::IO object
-sub loadIO {
-  my ($enum,$io) = @_;
+## $bool = $enum->loadNativeFh($fh)
+## + loads from handle
+## + implicitly sets $fh ':utf8' flag
+sub loadNativeFh {
+  my ($enum,$fh) = @_;
+  $fh->binmode(':utf8');
   my $id2sym = $enum->{id2sym};
   my $sym2id = $enum->{sym2id};
-  my $fh = $io->{fh};
   my ($line,$id,$sym);
   while (defined($line=<$fh>)) {
     chomp($line);

@@ -7,11 +7,14 @@
 package Lingua::TT::Document;
 use Lingua::TT::Token;
 use Lingua::TT::Sentence;
+use Lingua::TT::Persistent;
 use Encode qw(encode decode);
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
+
+our @ISA = qw(Lingua::TT::Persistent);
 
 ##==============================================================================
 ## Constructors etc.
@@ -121,12 +124,14 @@ sub flat {
 
 ## $str = $doc->toString()
 ##  + returns string representing $doc
+BEGIN { *saveNativeString = \&toString; }
 sub toString {
   return join("\n", map {$_->toString} @{$_[0]})."\n";
 }
 
 ## $doc = $doc->fromString($str)
 ##  + parses $doc from string $str
+BEGIN { *saveNativeString = \&toString; }
 sub fromString {
   #my ($sent,$str) = @_;
   @{$_[0]} = map {Lingua::TT::Sentence->newFromString($_)} split(/(?:\r?\n){2}/,$_[1]);
@@ -135,7 +140,7 @@ sub fromString {
 
 ## $doc = $CLASS_OR_OBJECT->fromFile($filename_or_fh,%opts)
 ##  + parses $doc from file
-BEGIN { *load = \&fromFile; }
+BEGIN { *load = *loadNativeFile = \&fromFile; }
 sub fromFile {
   my ($doc,$file,%opts) = @_;
   my $ttio = Lingua::TT::IO->fromFile($file,%opts)
@@ -149,7 +154,7 @@ sub fromFile {
 
 ## $doc = $CLASS_OR_OBJECT->toFile($filename_or_fh,%opts)
 ##  + saves $doc to file
-BEGIN { *save = \&toFile; }
+BEGIN { *save = *saveNativeFile = \&toFile; }
 sub toFile {
   my ($doc,$file,%opts) = @_;
   my $ttio = Lingua::TT::IO->toFile($file,%opts)
