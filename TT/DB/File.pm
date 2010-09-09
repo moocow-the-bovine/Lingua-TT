@@ -24,7 +24,7 @@ our @ISA = qw(Lingua::TT::Persistent);
 ## $dbf = CLASS_OR_OBJECT->new(%opts)
 ## + %opts, %$doc:
 ##   ##-- user options
-##   file  => $directory,  ##-- default: undef (none)
+##   file  => $filename,    ##-- default: undef (none)
 ##   mode  => $mode,       ##-- default: 0644
 ##   flags => $flags,      ##-- default: O_RDWR|O_CREAT
 ##   type    => $type,     ##-- one of 'HASH', 'BTREE', 'RECNO' (default: 'HASH')

@@ -66,12 +66,12 @@ sub getSym {
 ##==============================================================================
 ## Methods: I/O
 
-## $bool = $enum->saveNativeFh($fh)
+## $bool = $enum->saveNativeFh($fh,%opts)
 ## + saves to filehandle
-## + implicitly sets $fh ':utf8' flag
+## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
 sub saveNativeFh {
-  my ($enum,$fh) = @_;
-  $fh->binmode(':utf8');
+  my ($enum,$fh,%opts) = @_;
+  $fh->binmode(':utf8') if (!$opts{raw});
   my ($sym,$id);
   my $id2sym = $enum->{id2sym};
   for ($id=0; $id < $enum->{size}; $id++) {
@@ -83,10 +83,10 @@ sub saveNativeFh {
 
 ## $bool = $enum->loadNativeFh($fh)
 ## + loads from handle
-## + implicitly sets $fh ':utf8' flag
+## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
 sub loadNativeFh {
-  my ($enum,$fh) = @_;
-  $fh->binmode(':utf8');
+  my ($enum,$fh,%opts) = @_;
+  $fh->binmode(':utf8') if (!$opts{raw});
   my $id2sym = $enum->{id2sym};
   my $sym2id = $enum->{sym2id};
   my ($line,$id,$sym);
