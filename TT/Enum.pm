@@ -71,7 +71,9 @@ sub getSym {
 ## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
 sub saveNativeFh {
   my ($enum,$fh,%opts) = @_;
-  $fh->binmode(':utf8') if (!$opts{raw});
+  if (!$opts{raw}) {
+    CORE::binmode($fh,$opts{encoding} ? ":encoding($opts{encoding})" : ':utf8');
+  }
   my ($sym,$id);
   my $id2sym = $enum->{id2sym};
   for ($id=0; $id < $enum->{size}; $id++) {
@@ -86,7 +88,9 @@ sub saveNativeFh {
 ## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
 sub loadNativeFh {
   my ($enum,$fh,%opts) = @_;
-  $fh->binmode(':utf8') if (!$opts{raw});
+  if (!$opts{raw}) {
+    CORE::binmode($fh,$opts{encoding} ? ":encoding($opts{encoding})" : ':utf8');
+  }
   my $id2sym = $enum->{id2sym};
   my $sym2id = $enum->{sym2id};
   my ($line,$id,$sym);
