@@ -23,6 +23,7 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##    id2sym => \@id2sym, ##-- $id=>$sym, ...
 ##    size   => $n_ids,   ##-- index of first free id
 ##    io     => \%opts,   ##-- I/O opts; default={encoding=>'utf8'}
+##    maxid  => $max,     ##-- maximum allowable id, e.g. 2**16-1, 2**32-1, (default=undef: no max)
 sub new {
   my $that = shift;
   my $enum = bless({
@@ -30,6 +31,7 @@ sub new {
 		    id2sym => [],
 		    size => 0,
 		    io => {encoding=>'utf8'},
+		    maxid => undef,
 		    @_
 		   }, ref($that)||$that);
   return $enum;
@@ -51,6 +53,8 @@ sub clear {
 ##  + gets (possibly new) id for $sym
 sub getId {
   return $_[0]{sym2id}{$_[1]} if (exists($_[0]{sym2id}{$_[1]}));
+  confess(ref($_[0])."::getId(): maxid=$_[0]{maxid} exceeded!") ##-- check for overflow
+    if (defined($_[0]{maxid}) && $_[0]{size}==$_[0]{maxid});
   $_[0]{id2sym}[$_[0]{size}] = $_[1];
   return $_[0]{sym2id}{$_[1]} = $_[0]{size}++;
 }

@@ -19,13 +19,14 @@ our $VERSION = "0.01";
 
 ##-- program vars
 our $prog         = basename($0);
-our $outfile_db   = undef; ##-- default: "$infile.db"
-#our $outfile_enum = undef; ##-- default: "$infile.enum";
+our $outfile_db   = undef; ##-- default: "$infile.db$n"
+our $outfile_enum = undef; ##-- default: "$infile.enum";
 our $verbose      = 0;
 
 our $encoding = undef; ##-- default encoding (?)
-our $packfmt = 'N';
-our $eos_str = '__$';
+our $pack_key = 'w';
+our $pack_val = undef;
+our $eos_str  = '__$';
 our $n = 1;
 our $append = 0; ##-- are we adding to an existing db?
 
@@ -48,14 +49,15 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'pack|p:s' => \$packfmt,
-	   'nopack|raw|strings|P' => sub { $packfmt=''; },
+	   'pack-key|pk|p:s' => \$pack_key,
+	   'pack-value|pack-val|pv:s' => \$pack_val,
+	   'nopack|raw|strings|P' => sub { $pack_key=''; },
 	   'append|add|a!' => \$add,
 	   'truncate|trunc|clobber|t!' => sub { $add=!$_[1]; },
 	   'db-cachesize|db-cache|cache|c=f' => \$cachesize,
 	   'db-option|O=s' => $dbf{dbopts},
 	   'output-db|odb|db|output|out|o=s' => \$outfile_db,
-	   #'output-enum|oe|enum=s' => \$outfile_enum,
+	   'output-enum|oe|enum=s' => \$outfile_enum,
 	  );
 
 #pod2usage({-msg=>'Not enough arguments specified!', -exitval=>1, -verbose=>0}) if (@ARGV < 1);
@@ -86,8 +88,8 @@ push(@ARGV,'-') if (!@ARGV);
 our $ttin  = Lingua::TT::IO->new();
 
 ##-- defaults
-$outfile_db   = $ARGV[0].".db"      if (!defined($outfile_db));
-#$outfile_enum = $outfile_db.".enum" if (!defined($outfile_enum));
+$outfile_db   = $ARGV[0].".db${n}"  if (!defined($outfile_db));
+$outfile_enum = $outfile_db.".enum" if (!defined($outfile_enum));
 
 ##-- open db
 if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMG]?)\s*$/) {
@@ -106,18 +108,22 @@ our $data = $dbf->{data};
 ##-- create and possibly load enum
 our $enum = Lingua::TT::Enum->new();
 our %enum_io_opts = (defined($encoding) ? (encoding=>$encoding) : (raw=>1));
-if (exists($data->{'$ENUM$'})) {
-  $enum = $enum->loadNativeString($data->{'$ENUM$'},%enum_io_opts);
+if ($add && -e $outfile_enum) {
+  $enum = $enum->loadNativeFile($outfile_enum,%enum_io_opts)
+    or die("$prog: coult not open or create enum file '$outfile_enum': $!");
 }
-#die("$prog: coult not open or create enum file '$outfile_enum': $!") if (!$enum);
+#elsif (exists($data->{'$ENUM$'})) {
+#  $enum = $enum->loadNativeString($data->{'$ENUM$'},%enum_io_opts)
+#   or die("$prog: coult not read enum from DB key '\$ENUM\$': $!");
+#}
 
 our $sym2id = $enum->{sym2id};
 $enum->getId('');                     ##-- always map empty string (preferably to id 0)
 our $eos_id = $enum->getId($eos_str); ##-- ... and eos to 1
-our $eos_pk = $packfmt ? pack($packfmt,$eos_id) : $eos_str;
+our $eos_pk = $pack_key ? pack($pack_key,$eos_id) : $eos_str;
 
 ##-- nvars
-our $joinchar = $packfmt ? '' : "\t";
+our $joinchar = $pack_key ? '' : "\t";
 
 foreach $ttfile (@ARGV) {
   vmsg(1,"$prog: processing $ttfile...\n");
@@ -136,9 +142,9 @@ foreach $ttfile (@ARGV) {
     }
 
     chomp;
-    if ($packfmt) {
+    if ($pack_key) {
       $tok_id = $enum->getId($_) if (!defined($tok_id=$sym2id->{$_}));
-      $tok_pk = pack($packfmt,$tok_id);
+      $tok_pk = pack($pack_key,$tok_id);
     } else {
       $tok_pk = $_;
     }
@@ -153,6 +159,7 @@ foreach $ttfile (@ARGV) {
 }
 
 ##-- subs: eos counting
+BEGIN { our $nsents=0;  }
 sub count_eos {
   return if (!grep {$_ ne $eos_pk} @ngram);
   foreach (1..$n) {
@@ -160,6 +167,7 @@ sub count_eos {
     push(@ngram,$eos_pk);
     count_ngram();
   }
+  ++$nsents;
 }
 
 
@@ -170,8 +178,11 @@ sub count_ngram {
   #  $data->{$ngram_pk} = ($c=$data->{$ngram_pk})++
   #}
   ##
+  no warnings 'uninitialized';
   $ngram_pk = join($joinchar,@ngram);
-  $data->{$ngram_pk} = ++($_count=$data->{$ngram_pk});
+  $data->{$ngram_pk} = ($pack_val
+			? pack($pack_val,++($_count=unpack($pack_val,$data->{$ngram_pk})))
+			: ++($_count=$data->{$ngram_pk}));
 }
 
 ##-- cleanup: eos
@@ -180,15 +191,18 @@ sub count_ngram {
 #$data->{$eos1} = $data->{$eosN};
 #delete($data->{$eosN});
 
-##-- dump enum to db
-if ($packfmt) {
-  $data->{'$ENUM$'} = $enum->saveNativeString(%enum_io_opts);
+if ($pack_key) {
+  if (defined($outfile_enum)) {
+    $enum->saveNativeFile($outfile_enum,(defined($encoding) ? (encoding=>$encoding) : (raw=>1)))
+  }
+#  else {
+#    ##-- dump enum to db
+#    $data->{'$ENUM$'} = $enum->saveNativeString(%enum_io_opts);
+#  }
 }
 
 ##-- cleanup
 $dbf->close();
-#$enum->saveNativeFile($outfile_enum,(defined($encoding) ? (encoding=>$encoding) : (raw=>1)))
-#  if ($packfmt);
 
 ###############################################################
 ## pods
