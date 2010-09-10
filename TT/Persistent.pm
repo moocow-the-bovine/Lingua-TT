@@ -7,6 +7,8 @@
 package Lingua::TT::Persistent;
 #use Lingua::TT::Logger;
 use Lingua::TT::Unify;
+use Lingua::TT::IO;
+
 use Data::Dumper;
 use Storable;
 use IO::File;
@@ -381,10 +383,10 @@ sub loadBinFh {
 
 ## $rc = $obj->saveNativeFile($filename_or_fh, %args)
 ##  + save $obj as native data to a file or filehandle
-##  + calls $obj->saveBinFh($fh,%args)
+##  + calls $obj->saveNativeFh($fh,%args)
 sub saveNativeFile {
   my ($obj,$file,%args) = @_;
-  my $fh = ref($file) ? $file : IO::File->new(">$file");
+  my $fh = ref($file) ? $file : Lingua::TT::IO->open(">",$file,%args)->{fh};
   confess(ref($obj)."::saveNativeFile(): open failed for '$file': $!") if (!$fh);
   my $rc = $obj->saveNativeFh($fh,%args,dst=>$file);
   $fh->close() if (!ref($file));
@@ -396,7 +398,7 @@ sub saveNativeFile {
 ##  + calls $obj->loadNativeFh($fh,%args)
 sub loadNativeFile {
   my ($that,$file,%args) = @_;
-  my $fh = ref($file) ? $file : IO::File->new("<$file");
+  my $fh = ref($file) ? $file : Lingua::TT::IO->open("<",$file,%args)->{fh};
   confess((ref($that)||$that)."::loadNativeFile(): open failed for '$file': $!") if (!$fh);
   my $rc = $that->loadNativeFh($fh,%args,src=>$file);
   $fh->close() if (!ref($file));
@@ -412,9 +414,7 @@ sub loadNativeFile {
 sub saveNativeString {
   my ($obj,%args) = @_;
   my $str = '';
-  my $fh  = IO::Handle->new();
-  CORE::open($fh,'>',\$str)
-      or confess(ref($obj)."::saveNativeString(): could not open() filehandle for string ref");
+  my $fh  = Lingua::TT::IO->toString(\$str,%args)->{fh};
   my $rc = $obj->saveNativeFh($fh);
   $fh->close();
   return $rc ? $str : undef;
@@ -433,10 +433,7 @@ sub loadNativeString {
 	     : (length($str) <= 42
 		? $str
 		: (substr($str,0,42).'...')));
-
-  my $fh = IO::Handle->new();
-  CORE::open($fh,'<',(ref($str) ? $str : \$str))
-      or confess((ref($that)||$that)."::loadNativeString(): could not open() filehandle for string ref");
+  my $fh  = Lingua::TT::IO->fromString(\$str,%args)->{fh};
   my $rc = $that->loadNativeFh($fh,src=>$src,%args);
   $fh->close;
   return $rc;

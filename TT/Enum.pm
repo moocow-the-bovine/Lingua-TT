@@ -22,7 +22,6 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##    sym2id => \%sym2id, ##-- $sym=>$id, ...
 ##    id2sym => \@id2sym, ##-- $id=>$sym, ...
 ##    size   => $n_ids,   ##-- index of first free id
-##    io     => \%opts,   ##-- I/O opts; default={encoding=>'utf8'}
 ##    maxid  => $max,     ##-- maximum allowable id, e.g. 2**16-1, 2**32-1, (default=undef: no max)
 sub new {
   my $that = shift;
@@ -30,7 +29,6 @@ sub new {
 		    sym2id => {},
 		    id2sym => [],
 		    size => 0,
-		    io => {encoding=>'utf8'},
 		    maxid => undef,
 		    @_
 		   }, ref($that)||$that);
@@ -49,7 +47,7 @@ sub clear {
 ##==============================================================================
 ## Methods: Access and Manipulation
 
-## $id = $dbe->getId($sym)
+## $id = $enum->getId($sym)
 ##  + gets (possibly new) id for $sym
 sub getId {
   return $_[0]{sym2id}{$_[1]} if (exists($_[0]{sym2id}{$_[1]}));
@@ -59,7 +57,7 @@ sub getId {
   return $_[0]{sym2id}{$_[1]} = $_[0]{size}++;
 }
 
-## $id = $dbe->getSym($id)
+## $id = $enum->getSym($id)
 ##  + gets (possibly new (and if so, "SYM${i}")) symbol for $id
 sub getSym {
   return $_[0]{id2sym}[$_[1]] if ($_[1] < $_[0]{size});
@@ -67,47 +65,96 @@ sub getSym {
   return $_[0]{id2sym}[$_[1]] = "SYM$_[1]";
 }
 
+## $id = $enum->setId($sym=>$id)
+sub setId {
+  $_[0]{id2sym}{$_[1]}=$_[2];
+  $_[0]{sym2id}[$_[2]]=$_[1];
+  return $_[2];
+}
+
 ##==============================================================================
 ## Methods: I/O
+
+##--------------------------------------------------------------
+## Methods: I/O: Native
 
 ## $bool = $enum->saveNativeFh($fh,%opts)
 ## + saves to filehandle
 ## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
+## + %opts
+##    noids => $bool,    ##-- suppress printing of ids?
 sub saveNativeFh {
   my ($enum,$fh,%opts) = @_;
-  if (!$opts{raw}) {
-    CORE::binmode($fh,$opts{encoding} ? ":encoding($opts{encoding})" : ':utf8');
-  }
   my ($sym,$id);
-  my $id2sym = $enum->{id2sym};
-  for ($id=0; $id < $enum->{size}; $id++) {
-    next if (!exists($id2sym->[$id]));
-    $fh->print($id,"\t",$id2sym->[$id],"\n");
+  if ($opts{noids}) {
+    my $id2sym = $enum->{id2sym};
+    $fh->print(map {(defined($_) ? $_ : '')."\n"} @$id2sym);
+  } else {
+    my $sym2id = $enum->{sym2id};
+    foreach $sym (sort {$sym2id->{$a} <=> $sym2id->{$b}} keys (%$sym2id)) {
+      $fh->print($sym2id->{$sym}, "\t", $sym, "\n");
+    }
   }
   return $enum;
 }
 
 ## $bool = $enum->loadNativeFh($fh)
 ## + loads from handle
-## + implicitly sets $fh ':utf8' flag unless $opts{raw} is set
+## + %opts
+##    encoding => $enc,  ##-- use encoding (default='utf8', unless 'raw' is true)
+##    noids => $bool,    ##-- don't expect to load ids?
 sub loadNativeFh {
   my ($enum,$fh,%opts) = @_;
-  if (!$opts{raw}) {
-    CORE::binmode($fh,$opts{encoding} ? ":encoding($opts{encoding})" : ':utf8');
-  }
+  $enum = $enum->new() if (!ref($enum));
   my $id2sym = $enum->{id2sym};
   my $sym2id = $enum->{sym2id};
-  my ($line,$id,$sym);
-  while (defined($line=<$fh>)) {
-    chomp($line);
-    next if ($line =~ /^\s*$/ || $line =~ /^%%/);
-    ($id,$sym) = split(/\t/,$line,2);
-    $id2sym->[$id]  = $sym;
-    $sym2id->{$sym} = $id;
+  my ($line,$sym);
+  my $id=0;
+  if ($opts{noids}) {
+    while (defined($sym=<$fh>)) {
+      chomp($sym);
+      $id2sym->[$id]  = $sym;
+      $sym2id->{$sym} = $id;
+      ++$id;
+    }
+  } else {
+    while (defined($line=<$fh>)) {
+      chomp($line);
+      next if ($line =~ /^\s*$/ || $line =~ /^%%/);
+      ($id,$sym) = split(/\t/,$line,2);
+      $id2sym->[$id]  = $sym;
+      $sym2id->{$sym} = $id;
+    }
   }
   $enum->{size} = scalar(@$id2sym);
   return $enum;
 }
+
+##--------------------------------------------------------------
+## Methods: I/O: Bin
+
+
+## ($serialized_string,\@other_refs) = STORABLE_freeze($obj, $cloning_flag)
+sub STORABLE_freeze {
+  my ($obj,$cloning) = @_;
+  return ('',[map { $_ eq 'sym2id' ? qw() : ($_=>$obj->{$_}) } keys(%$obj)]);
+}
+
+## $obj = STORABLE_thaw($obj, $cloning_flag, $serialized_string, @other_refs)
+sub STORABLE_thaw {
+  my ($obj,$cloning,$str,$ar) = @_;
+  if (!defined($str) || $str eq '') {
+    ##-- backwards-compatibility
+    %$obj = @$ar;
+    #return $obj if (ref($obj) ne __PACKAGE__); ##-- hack
+    $obj->{sym2id} = {} if (!defined($obj->{sym2id}));
+    @{$obj->{sym2id}}{grep {defined($_)} @{$obj->{id2sym}}}
+      = grep {defined($obj->{id2sym}[$_])} (0..$#{$obj->{id2sym}});
+  }
+  return $obj;
+}
+
+
 
 ##==============================================================================
 ## Footer
