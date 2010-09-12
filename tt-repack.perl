@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Unigrams;
+use Lingua::TT::Enum;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -20,15 +20,8 @@ our $prog     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
-our $encoding     = undef;
-our $enum_infile  = undef;
-our $enum_ids     = 0;
-
-our $globargs = 1; ##-- glob @ARGV?
-our $listargs = 0; ##-- args are file-lists?
-our $want_cmts = 1;
-our $eos       = '';
-our $sort      = 'freq'; ##-- one of qw(freq lex none)
+our $packfmt   = 'w';
+our $unpackfmt = 'N';
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -39,20 +32,15 @@ GetOptions(##-- general
 	   'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
-	   'glob|g!' => \$globargs,
-	   'list|l!' => \$listargs,
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
-	   'comments|cmts|c!' => \$want_cmts,
-	   'eos|s:s' => \$eos,
-	   'no-eos|noeos|S' => sub { undef $eos; },
-	   #'sort=s' => \$sort,
-	   'nosort' => sub { $sort='none'; },
-	   'freqsort|fsort|fs' => sub {$sort='freq'; },
-	   'lexsort|lsort|ls' => sub {$sort='lex'; },
+	   'from|unpackfmt|unpack|u=s' => \$unpackfmt,
+	   'to|packfmt|pack|p=s' => \$packfmt,
+	   #'delim|d:s' => \$delim,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
+#pod2usage({-exitval=>0,-verbose=>0,-msg=>'No ENUM specified!'}) if (!@ARGV);
+#$enumfile = shift;
 
 if ($version || $verbose >= 2) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
@@ -71,52 +59,27 @@ sub vmsg {
 }
 
 ##----------------------------------------------------------------------
-## subs: guts
-our %wf = qw(); ##-- $text => $freq, ...
-our $ug = Lingua::TT::Unigrams->new(wf=>\%wf);
-sub processFile {
-  my $ttfile = shift;
-  my $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>$encoding)
-    or die("$0: open failed for input file '$ttfile': $!");
-  my $infh = $ttin->{fh};
-
-  while (defined($_=<$infh>)) {
-    chomp;
-    next if ((/^\s*%%/ && !$want_cmts));
-    $_ = $eos if ($_ eq '');
-    next if (!defined($_));
-    ++$wf{$_};
-  }
-  $infh->close();
-}
-
-##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
-our @infiles = $globargs ? (map {glob($_)} @ARGV) : @ARGV;
-if ($listargs) {
-  ##-- @infiles are file-lists: expand
-  @listfiles = @infiles;
-  @infiles = qw();
-  foreach $listfile (@listfiles) {
-    vmsg(1,"$prog: list: $listfile\n");
-    open(LIST,"<$listfile")
-      or die("$prog: open failed for list file '$listfile': $!");
-    push(@infiles,map {chomp; $_} <LIST>);
-    close(LIST);
-  }
-}
-
 ##-- guts
-foreach $ttfile (@infiles) {
-  vmsg(1,"$prog: tt: $ttfile\n");
-  processFile($ttfile);
-}
+our $outfh = IO::File->new(">$outfile")
+  or die("$prog: open failed for output file '$outfile': $!");
+binmode($outfh);
 
-##-- save
-$ug->saveNativeFile($outfile,sort=>$sort,encoding=>$encoding)
-  or die("$prog: save failed to '$outfile': $!");
+push(@ARGV,'-') if (!@ARGV);
+foreach $infile (@ARGV) {
+  my $infh = IO::File->new("<$infile")
+    or die("$prog: open failed for input file '$infile': $!");
+
+  ##-- fast mode (always)
+  local $/=undef;
+  $buf = <$infh>;
+  $outfh->print(pack("${packfmt}*",unpack("${unpackfmt}*",$buf)));
+  $infh->close();
+}
+$outfh->close();
+
 
 __END__
 
@@ -128,11 +91,11 @@ __END__
 
 =head1 NAME
 
-tt-1grams.perl - get unigrams from TT file(s)
+tt-repack.perl - recode packed tt files
 
 =head1 SYNOPSIS
 
- tt-1grams.perl [OPTIONS] [TTFILE(s)]
+ tt-repack.perl [OPTIONS] [PACKED_FILE(s)]
 
  General Options:
    -help
@@ -140,16 +103,9 @@ tt-1grams.perl - get unigrams from TT file(s)
    -verbose LEVEL
 
  Other Options:
-   -list , -nolist      ##-- TTFILE argument(s) are/aren't file-lists (default=no)
-   -glob , -noglob      ##-- do/don't glob TTFILE argument(s) (default=do)
-   -cmts , -nocmts      ##-- do/don't count comments (default=don't)
-   -eos EOS             ##-- count eos as string EOS (default='')
-   -noeos               ##-- do/don't count EOS at all
-   -freqsort            ##-- sort output by frequency (default)
-   -lexsort             ##-- sort output lexically
-   -nosort              ##-- don't sort output at all
-   -encoding ENC        ##-- input encoding (default=raw)
-   -output FILE         ##-- output file (default=STDOUT)
+   -unpack TEMPLATE       ##-- input pack template (default='w')
+   -pack   TEMPLATE       ##-- output pack template (default='N')
+   -output FILE           ##-- output file (default=STDOUT)
 
 =cut
 

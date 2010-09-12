@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Unigrams;
+use Lingua::TT::Enum;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -21,14 +21,14 @@ our $verbose      = 1;
 
 our $outfile      = '-';
 our $encoding     = undef;
-our $enum_infile  = undef;
+our $enumfile     = undef,
 our $enum_ids     = 0;
 
-our $globargs = 1; ##-- glob @ARGV?
-our $listargs = 0; ##-- args are file-lists?
+our $packfmt = 'N';
+our $delim = '';
+
 our $want_cmts = 1;
-our $eos       = '';
-our $sort      = 'freq'; ##-- one of qw(freq lex none)
+our $want_eos  = 1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -39,20 +39,20 @@ GetOptions(##-- general
 	   'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
-	   'glob|g!' => \$globargs,
-	   'list|l!' => \$listargs,
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
+	   'enum-ids|ids|ei!' => \$enum_ids,
+
+	   'packfmt|pack|p=s' => \$packfmt,
+	   'delim|d:s' => \$delim,
+
 	   'comments|cmts|c!' => \$want_cmts,
-	   'eos|s:s' => \$eos,
-	   'no-eos|noeos|S' => sub { undef $eos; },
-	   #'sort=s' => \$sort,
-	   'nosort' => sub { $sort='none'; },
-	   'freqsort|fsort|fs' => sub {$sort='freq'; },
-	   'lexsort|lsort|ls' => sub {$sort='lex'; },
+	   'eos|s!' => \$want_eos,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No ENUM specified!'}) if (!@ARGV);
+$enumfile = shift;
 
 if ($version || $verbose >= 2) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
@@ -71,52 +71,45 @@ sub vmsg {
 }
 
 ##----------------------------------------------------------------------
-## subs: guts
-our %wf = qw(); ##-- $text => $freq, ...
-our $ug = Lingua::TT::Unigrams->new(wf=>\%wf);
-sub processFile {
-  my $ttfile = shift;
-  my $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>$encoding)
-    or die("$0: open failed for input file '$ttfile': $!");
+## MAIN
+##----------------------------------------------------------------------
+
+##-- open enum
+our $enum = Lingua::TT::Enum->new();
+our %enum_io_opts = (encoding=>$encoding, noids=>(!$enum_ids));
+$enum = $enum->loadNativeFile($enumfile,%enum_io_opts)
+    or die("$prog: coult not load enum file '$enumfile': $!");
+
+##-- guts
+our $outfh = IO::File->new(">$outfile")
+  or die("$prog: open failed for output file '$outfile': $!");
+$outfh->binmode();
+our ($ttin);
+
+##-- sanity check(s)
+$delim = chr(0)  if (($delim eq '') && $packfmt eq 'w');
+$hibit = chr(128);  ##-- for 'w' pack format
+
+foreach $infile (@ARGV) {
+  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
+    or die("$0: open failed for input file '$infile': $!");
   my $infh = $ttin->{fh};
 
   while (defined($_=<$infh>)) {
     chomp;
-    next if ((/^\s*%%/ && !$want_cmts));
-    $_ = $eos if ($_ eq '');
-    next if (!defined($_));
-    ++$wf{$_};
+    next if ((/^\s*%%/ && !$want_cmts) || ($_ eq '' && !$want_eos));
+    if (!defined($id = $enum->{sym2id}{$_})) {
+      warn("$prog: WARNING: no id for input '$_'; using zero");
+      $id=0;
+    }
+    $packed = pack($packfmt,$id);
+    substr($packed,length($packed)-1) |= $hibit if ($packfmt eq 'w');
+    $outfh->print($packed,$delim);
   }
   $infh->close();
 }
+$outfh->close();
 
-##----------------------------------------------------------------------
-## MAIN
-##----------------------------------------------------------------------
-
-our @infiles = $globargs ? (map {glob($_)} @ARGV) : @ARGV;
-if ($listargs) {
-  ##-- @infiles are file-lists: expand
-  @listfiles = @infiles;
-  @infiles = qw();
-  foreach $listfile (@listfiles) {
-    vmsg(1,"$prog: list: $listfile\n");
-    open(LIST,"<$listfile")
-      or die("$prog: open failed for list file '$listfile': $!");
-    push(@infiles,map {chomp; $_} <LIST>);
-    close(LIST);
-  }
-}
-
-##-- guts
-foreach $ttfile (@infiles) {
-  vmsg(1,"$prog: tt: $ttfile\n");
-  processFile($ttfile);
-}
-
-##-- save
-$ug->saveNativeFile($outfile,sort=>$sort,encoding=>$encoding)
-  or die("$prog: save failed to '$outfile': $!");
 
 __END__
 
@@ -128,11 +121,11 @@ __END__
 
 =head1 NAME
 
-tt-1grams.perl - get unigrams from TT file(s)
+tt-pack.perl - encode tt files using pre-compiled enum
 
 =head1 SYNOPSIS
 
- tt-1grams.perl [OPTIONS] [TTFILE(s)]
+ tt-pack.perl [OPTIONS] ENUM [TTFILE(s)]
 
  General Options:
    -help
@@ -140,14 +133,11 @@ tt-1grams.perl - get unigrams from TT file(s)
    -verbose LEVEL
 
  Other Options:
-   -list , -nolist      ##-- TTFILE argument(s) are/aren't file-lists (default=no)
-   -glob , -noglob      ##-- do/don't glob TTFILE argument(s) (default=do)
-   -cmts , -nocmts      ##-- do/don't count comments (default=don't)
-   -eos EOS             ##-- count eos as string EOS (default='')
-   -noeos               ##-- do/don't count EOS at all
-   -freqsort            ##-- sort output by frequency (default)
-   -lexsort             ##-- sort output lexically
-   -nosort              ##-- don't sort output at all
+   -ids  , -noids       ##-- do/don't expect ids in ENUM (default=don't)
+   -cmts , -nocmts      ##-- do/don't pack comments (requires comments in ENUM; default=don't)
+   -eos  , -noeos       ##-- do/don't pack EOS (requires empty string in ENUM; default=do)
+   -pack TEMPLATE       ##-- pack template for output ids (default='N')
+   -delim DELIM         ##-- output token delimiter (default='')
    -encoding ENC        ##-- input encoding (default=raw)
    -output FILE         ##-- output file (default=STDOUT)
 
