@@ -135,6 +135,13 @@ tt-pack.perl - encode tt files using pre-compiled enum
    -encoding ENC        ##-- input encoding (default=raw)
    -output FILE         ##-- output file (default=STDOUT)
 
+ Some useful pack formats:
+   -pack=n              ##-- 16-bit big-endian integers (overflow danger!)
+   -pack=N              ##-- 32-bit big-endian integers (default)
+   -pack=w              ##-- BER compressed integers (smallest)
+   -pack=z              ##-- like -pack=w -delim="\0" (DB_RECNO compatible)
+   -pack='A*' -delim=\n ##-- ASCII decimal strings (e.g. dump)
+
 =cut
 
 ###############################################################

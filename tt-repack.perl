@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Enum;
+use Lingua::TT::Packed;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -20,8 +20,20 @@ our $prog     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
-our $packfmt   = 'w';
-our $unpackfmt = 'N';
+
+our %opts_common = (
+		    badqid => 0,
+		    badsym => '',
+		    fast => 1, ##-- -fast helps a lot for unpack()
+		   );
+our %opts_from = (
+		  packfmt=>'N',
+		  delim=>'',
+		 );
+our %opts_to = (
+		packfmt=>'N',
+		delim=>'',
+	       );
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -32,10 +44,13 @@ GetOptions(##-- general
 	   'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
+	   'buffer|buf|fast!' => \$opts_common{fast},
+	   'slow|paranoid' => sub { $opts_common{fast}=!$_[1]; },
 	   'output|o=s' => \$outfile,
-	   'from|unpackfmt|unpack|u=s' => \$unpackfmt,
-	   'to|packfmt|pack|p=s' => \$packfmt,
-	   #'delim|d:s' => \$delim,
+	   'from|unpackfmt|unpack|u=s' => \$opts_from{packfmt},
+	   'from-delim|unpack-delim|ud:s' => \$opts_from{delim},
+	   'to|packfmt|pack|p=s' => \$opts_to{packfmt},
+	   'to-delim|pack-delim|pd:s' => \$opts_to{delim},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -63,22 +78,19 @@ sub vmsg {
 ##----------------------------------------------------------------------
 
 ##-- guts
-our $outfh = IO::File->new(">$outfile")
-  or die("$prog: open failed for output file '$outfile': $!");
-binmode($outfh);
+our $pk_from = Lingua::TT::Packed->new(%opts_common,%opts_from)
+  or die("$prog: could not create source Packed object: $!");
+our $pk_to   = Lingua::TT::Packed->new(%opts_common,%opts_to)
+  or die("$prog: could not create sink Packed object: $!");
 
 push(@ARGV,'-') if (!@ARGV);
 foreach $infile (@ARGV) {
-  my $infh = IO::File->new("<$infile")
-    or die("$prog: open failed for input file '$infile': $!");
-
-  ##-- fast mode (always)
-  local $/=undef;
-  $buf = <$infh>;
-  $outfh->print(pack("${packfmt}*",unpack("${unpackfmt}*",$buf)));
-  $infh->close();
+  $pk_from->loadFile($infile)
+    or die("$prog: load failed for input file '$infile': $!")
 }
-$outfh->close();
+$pk_to->ids($pk_from->ids);
+$pk_to->saveFile($outfile)
+  or die("$prog: save failed to '$outfile': $!");
 
 
 __END__
@@ -103,8 +115,10 @@ tt-repack.perl - recode packed tt files
    -verbose LEVEL
 
  Other Options:
-   -unpack TEMPLATE       ##-- input pack template (default='w')
-   -pack   TEMPLATE       ##-- output pack template (default='N')
+   -unpack       TEMPLATE ##-- input pack template (default='N')
+   -unpack-delim DELIM    ##-- input delimiter (default='')
+   -pack         TEMPLATE ##-- output pack template (default='N')
+   -pack-delim   DELIM    ##-- output delimiter (default='')
    -output FILE           ##-- output file (default=STDOUT)
 
 =cut

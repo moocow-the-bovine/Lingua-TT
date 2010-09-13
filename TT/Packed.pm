@@ -70,7 +70,7 @@ sub clearData {
 ##  + gets/sets packed data ids
 sub ids {
   my ($pk,$ids) = @_;
-  my $delim = $pk->delim;
+  my $delim = $pk->{delim} || '';
   if ($ids) {
     if ($delim) {
       ##-- set, +delim
@@ -121,7 +121,7 @@ sub loadNativeFh {
   $pk = $pk->new if (!ref($pk));
   CORE::binmode($fh,':bytes:raw');
   local $/=undef;
-  $pk->{data} = <$fh>;
+  $pk->{data} .= <$fh>;
   return $pk;
 }
 
