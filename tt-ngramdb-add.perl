@@ -19,19 +19,17 @@ our $VERSION = "0.01";
 
 ##-- program vars
 our $prog         = basename($0);
-our $outfile_db   = undef; ##-- default: "$infile.db$n"
-our $outfile_enum = undef; ##-- default: "$infile.enum";
+our $outfile_db   = undef; ##-- default: "$infile.db"
 our $verbose      = 0;
 
-our $encoding = undef; ##-- default encoding (?)
 our $pack_key = 'w';
-our $pack_val = undef;
-our $eos_str  = '__$';
-our $n = 1;
+our $pack_val = 'w';
+our $eos_id   = undef;
 our $append = 0; ##-- are we adding to an existing db?
+our $hex_input = 0;
 
 our %dbf    = (type=>'BTREE', flags=>O_RDWR|O_CREAT, dbopts=>{});
-our $cachesize = 128*1024*1024;
+our $cachesize = '128M';
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -42,22 +40,20 @@ GetOptions(##-- general
 	  'verbose|v=i' => \$verbose,
 
 	   ##-- Behavior
-	   'n=i' => \$n,
-	   'eos=s' => \$eos_str,
-	   'encoding|enc|e=s' => \$encoding,
+	   'eos-id|ei:i' => \$eos_id,
+	   'hex-input|hex|x!' => \$hex_input,
 
 	   ##-- I/O
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
 	   'pack-key|pk|p:s' => \$pack_key,
 	   'pack-value|pack-val|pv:s' => \$pack_val,
-	   'nopack|raw|strings|P' => sub { $pack_key=''; },
-	   'append|add|a!' => \$add,
-	   'truncate|trunc|clobber|t!' => sub { $add=!$_[1]; },
-	   'db-cachesize|db-cache|cache|c=f' => \$cachesize,
+	   'nopack|raw|P' => sub { $pack_key=$pack_val=undef; },
+	   'append|add|a!' => \$append,
+	   'truncate|trunc|clobber|t!' => sub { $append=!$_[1]; },
+	   'db-cachesize|db-cache|cache|c=s' => \$cachesize,
 	   'db-option|O=s' => $dbf{dbopts},
 	   'output-db|odb|db|output|out|o=s' => \$outfile_db,
-	   'output-enum|oe|enum=s' => \$outfile_enum,
 	  );
 
 #pod2usage({-msg=>'Not enough arguments specified!', -exitval=>1, -verbose=>0}) if (@ARGV < 1);
@@ -84,121 +80,47 @@ sub vmsg {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-push(@ARGV,'-') if (!@ARGV);
-our $ttin  = Lingua::TT::IO->new();
 
 ##-- defaults
-$outfile_db   = $ARGV[0].".db${n}"  if (!defined($outfile_db));
-$outfile_enum = $outfile_db.".enum" if (!defined($outfile_enum));
+$outfile_db   = $ARGV[0].".db"  if (!defined($outfile_db));
+$pack_key .= '*' if ($pack_key && $pack_key !~ m/\*$/);
 
 ##-- open db
-if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMG]?)\s*$/) {
-  my ($cache,$suff) = ($1,$2);
+if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
+  my ($size,$suff) = ($1,$2);
   $suff = 'B' if (!defined($suff));
-  $cache *= 1024 if ($suff eq 'K');
-  $cache *= 1024*1024 if ($suff eq 'M');
-  $cache *= 1024*1024 if ($suff eq 'G');
-  $dbf{dbopts}{cachesize} = $cachesize;
+  $size *= 1024    if ($suff eq 'K');
+  $size *= 1024**2 if ($suff eq 'M');
+  $size *= 1024**3 if ($suff eq 'G');
+  $size *= 1024**4 if ($suff eq 'T');
+  $dbf{dbopts}{cachesize} = $size;
 }
-$dbf{flags} |=  O_TRUNC if (!$add);
+$dbf{flags} |=  O_TRUNC if (!$append);
 our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile_db)
   or die("$prog: could not open or create DB file '$outfile_db': $!");
 our $data = $dbf->{data};
 
-##-- create and possibly load enum
-our $enum = Lingua::TT::Enum->new();
-our %enum_io_opts = (defined($encoding) ? (encoding=>$encoding) : (raw=>1));
-if ($add && -e $outfile_enum) {
-  $enum = $enum->loadNativeFile($outfile_enum,%enum_io_opts)
-    or die("$prog: coult not open or create enum file '$outfile_enum': $!");
-}
-#elsif (exists($data->{'$ENUM$'})) {
-#  $enum = $enum->loadNativeString($data->{'$ENUM$'},%enum_io_opts)
-#   or die("$prog: coult not read enum from DB key '\$ENUM\$': $!");
-#}
+push(@ARGV,'-') if (!@ARGV);
+foreach $ngfile (@ARGV) {
+  vmsg(1,"$prog: processing $ngfile...\n");
 
-our $sym2id = $enum->{sym2id};
-$enum->getId('');                     ##-- always map empty string (preferably to id 0)
-our $eos_id = $enum->getId($eos_str); ##-- ... and eos to 1
-our $eos_pk = $pack_key ? pack($pack_key,$eos_id) : $eos_str;
-
-##-- nvars
-our $joinchar = $pack_key ? '' : "\t";
-
-foreach $ttfile (@ARGV) {
-  vmsg(1,"$prog: processing $ttfile...\n");
-
-  $ttin->fromFile($ttfile,encoding=>$encoding)
-    or die("$prog: open failed for '$ttfile': $!");
+  our $ttin = Lingua::TT::IO->fromFile($ngfile,encoding=>undef)
+    or die("$prog: open failed for '$ngfile': $!");
   our $infh = $ttin->{fh};
 
-  our @ngram = map {$eos_pk} (1..$n); ##-- ($packid,$packid,...)
-
   while (defined($_=<$infh>)) {
-    next if (/^\%\%/); ##-- comment
-    if (/^\s*$/) {
-      count_eos();
-      next;
-    }
-
-    chomp;
-    if ($pack_key) {
-      $tok_id = $enum->getId($_) if (!defined($tok_id=$sym2id->{$_}));
-      $tok_pk = pack($pack_key,$tok_id);
-    } else {
-      $tok_pk = $_;
-    }
-    shift(@ngram);
-    push(@ngram,$tok_pk);
-    count_ngram();
+    next if (/^\%\%/ || /^\s*$/ || /__\$/); ##-- comment or blank line or moot-eos
+    @ids = split(/\t/,$_);
+    $f   = pop(@ids);
+    @ids = map {hex($_)} @ids if ($hex_input);
+    $key = $pack_key ? pack($pack_key,@ids) : join("\t",@ids);
+    $val = $data->{$key};
+    $val = unpack($pack_val,$val) if ($val && $pack_val);
+    $val += $f;
+    $data->{$key} = $pack_val ? pack($pack_val,$val) : $val;
   }
-  ##-- count final eos
-  count_eos();
 
   $ttin->close();
-}
-
-##-- subs: eos counting
-BEGIN { our $nsents=0;  }
-sub count_eos {
-  return if (!grep {$_ ne $eos_pk} @ngram);
-  foreach (1..$n) {
-    shift(@ngram);
-    push(@ngram,$eos_pk);
-    count_ngram();
-  }
-  ++$nsents;
-}
-
-
-our ($_count);
-sub count_ngram {
-  #foreach (1..$n) {
-  #  $ngram_pk = join($joinchar,,@ngram[(@ngram-$_)..$#ngram]);
-  #  $data->{$ngram_pk} = ($c=$data->{$ngram_pk})++
-  #}
-  ##
-  no warnings 'uninitialized';
-  $ngram_pk = join($joinchar,@ngram);
-  $data->{$ngram_pk} = ($pack_val
-			? pack($pack_val,++($_count=unpack($pack_val,$data->{$ngram_pk})))
-			: ++($_count=$data->{$ngram_pk}));
-}
-
-##-- cleanup: eos
-#$eosN = join($joinchar, map {$eos_pk} (1..$n));
-#$eos1 = $eos_pk;
-#$data->{$eos1} = $data->{$eosN};
-#delete($data->{$eosN});
-
-if ($pack_key) {
-  if (defined($outfile_enum)) {
-    $enum->saveNativeFile($outfile_enum,(defined($encoding) ? (encoding=>$encoding) : (raw=>1)))
-  }
-#  else {
-#    ##-- dump enum to db
-#    $data->{'$ENUM$'} = $enum->saveNativeString(%enum_io_opts);
-#  }
 }
 
 ##-- cleanup
@@ -216,7 +138,7 @@ tt-ngramdb-add.perl - add n-gram counts for tt files to a Berkely db
 
 =head1 SYNOPSIS
 
- tt-ngramdb-add.perl [OPTIONS] TT_FILE(s)
+ tt-ngramdb-add.perl [OPTIONS] ID_123_FILE(s)
 
  General Options:
    -help                     ##-- this help message
@@ -224,19 +146,16 @@ tt-ngramdb-add.perl - add n-gram counts for tt files to a Berkely db
    -verbose LEVEL            ##-- set verbosity (0..?)
 
  Counting Options:
-   -n   N                    ##-- maximum n-gram length
-   -eos STRING               ##-- set EOS string (default='__$')
+   -eos-id ID                ##-- set EOS id (default=0)
 
  I/O Options:
-   -encoding ENCODING        ##-- set input encoding (default=none)
+   -pack-key PACKFMT         ##-- set DB key pack format (default='w*')
+   -pack-val PACKFMT         ##-- set DB key pack format (default='w')
+   -append  , -truncate      ##-- do/don't append to existing file(s) (default:-add)
    -db-hash , -db-btree      ##-- set output DB type (default='HASH')
-   -pack PACKFMT             ##-- set output pack format (default='N')
-   -raw                      ##-- store raw strings instead of packed IDs
-   -append , -clobber        ##-- do/don't append to existing file(s) (default:-add)
-   -cache SIZE               ##-- set db cache size (with suffixes 'K','M','G')
+   -db-cache SIZE            ##-- set db cache size (with suffixes 'K','M','G','T')
    -db-option OPT=VAL        ##-- set DB option
    -output-db DBFILE         ##-- set output DB file (default=TT_FILE.db)
-   -output-enum ENUMFILE     ##-- set output enum file (default=DBFILE.enum)
 
 =cut
 

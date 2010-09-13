@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 
-use lib '.';
-use Lingua::TT;
-use Lingua::TT::Enum;
-
+use IO::File;
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
 use File::Basename qw(basename);
+use Text::Balanced qw(extract_codeblock extract_quotelike extract_multiple);
 
+use lib '.';
+use Lingua::TT;
 
 ##----------------------------------------------------------------------
 ## Globals
@@ -16,43 +16,30 @@ use File::Basename qw(basename);
 our $VERSION = "0.01";
 
 ##-- program vars
-our $prog     = basename($0);
-our $verbose      = 1;
-
+our $prog         = basename($0);
 our $outfile      = '-';
-our $encoding     = undef;
-our $enumfile     = undef,
-our $enum_ids     = 0;
+our $verbose      = 0;
 
-our $packfmt = 'N';
-our $delim = '';
-
-our $want_cmts = 1;
-our $want_eos  = 1;
+our $encoding = undef; ##-- default encoding (?)
+our $code_byline = undef;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
 GetOptions(##-- general
-	   'help|h' => \$help,
-	   'version|V' => \$version,
-	   'verbose|v=i' => \$verbose,
+	  'help|h' => \$help,
+	  #'man|m'  => \$man,
+	  'version|V' => \$version,
+	  'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
-	   'enum-ids|ids|ei!' => \$enum_ids,
-
-	   'packfmt|pack|p=s' => \$packfmt,
-	   'delim|d:s' => \$delim,
-
-	   'comments|cmts|c!' => \$want_cmts,
-	   'eos|s!' => \$want_eos,
+	   'encoding|e:s' => \$encoding,
 	  );
 
+pod2usage({-msg=>'Not enough arguments specified!',-exitval=>1,-verbose=>0}) if (@ARGV < 1);
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No ENUM specified!'}) if (!@ARGV);
-$enumfile = shift;
+#pod2usage({-exitval=>0,-verbose=>1}) if ($man);
 
 if ($version || $verbose >= 2) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
@@ -70,48 +57,54 @@ sub vmsg {
   print STDERR (@_) if ($verbose >= $level);
 }
 
+
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
+$encoding = undef if (defined($encoding) && ($encoding eq '' || $encoding eq 'raw'));
+our $ttout = Lingua::TT::IO->new->toFile($outfile,encoding=>$encoding)
+  or die("$prog: open failed for '$outfile': $!");
+our $outfh = $ttout->{fh};
+select($outfh);
 
-##-- open enum
-our $enum = Lingua::TT::Enum->new();
-our %enum_io_opts = (encoding=>$encoding, noids=>(!$enum_ids));
-$enum = $enum->loadNativeFile($enumfile,%enum_io_opts)
-    or die("$prog: coult not load enum file '$enumfile': $!");
+##-- pre compile eval sub
+##  + vars:
+##      $ARGV : current file
+##      $ttin : input Lingua::TT::IO object
+##      $infh : input filehandle
+##      $outfh: output filehandle (select()ed)
+##      $_    : current line (chomped)
+##      @_    : current line (split)
+our ($infile,$ttin,$infh);
+$code_byline = shift;
+our $dofile_code = q(
+sub {
+  while (defined($_=<$infh>)) {
+    s/\r?\n?$//s;
+    @_ = split(/\t/,$_);
+    ##-- BEGIN user code
+    ).$code_byline.q(;
+    ##-- END user code
+  }
+});
+vmsg(3,"$prog: DEBUG: User code sub\n",
+     map {"$prog: DEBUG: $_\n"} split(/\n/,$dofile_code));
+our $dofile_sub = eval $dofile_code;
+die("$prog: could not pre-compile sub: $@") if ($@ || !$dofile_sub);
 
-##-- guts
-our $outfh = IO::File->new(">$outfile")
-  or die("$prog: open failed for output file '$outfile': $!");
-$outfh->binmode();
-our ($ttin);
 
-##-- sanity check(s)
-$delim = chr(0)  if (($delim eq '') && $packfmt eq 'w');
-$hibit = chr(128);  ##-- for 'w' pack format
-
+push(@ARGV,'-') if (!@ARGV);
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
-    or die("$0: open failed for input file '$infile': $!");
-  my $infh = $ttin->{fh};
+    or die("$prog: open failed for '$infile': $!");
+  $infh = $ttin->{fh};
 
-  while (defined($_=<$infh>)) {
-    chomp;
-    next if ((/^\s*%%/ && !$want_cmts) || ($_ eq '' && !$want_eos));
-    if (!defined($id = $enum->{sym2id}{$_})) {
-      warn("$prog: WARNING: no id for input '$_'; using zero");
-      $id=0;
-    }
-    $packed = pack($packfmt,$id);
-    substr($packed,length($packed)-1) |= $hibit if ($packfmt eq 'w');
-    $outfh->print($packed,$delim);
-  }
-  $infh->close();
+  $dofile_sub->();
+  $ttin->close();
 }
-$outfh->close();
 
-
-__END__
+##-- cleanup
+$ttout->close;
 
 ###############################################################
 ## pods
@@ -121,11 +114,11 @@ __END__
 
 =head1 NAME
 
-tt-pack.perl - encode tt files using pre-compiled enum
+tt-eval.perl - eval perl code for each line of .tt files
 
 =head1 SYNOPSIS
 
- tt-pack.perl [OPTIONS] ENUM [TTFILE(s)]
+ tt-eval.perl [OPTIONS] PERLCODE [TT_FILE(s)...]
 
  General Options:
    -help
@@ -133,13 +126,16 @@ tt-pack.perl - encode tt files using pre-compiled enum
    -verbose LEVEL
 
  Other Options:
-   -ids  , -noids       ##-- do/don't expect ids in ENUM (default=don't)
-   -cmts , -nocmts      ##-- do/don't pack comments (requires comments in ENUM; default=don't)
-   -eos  , -noeos       ##-- do/don't pack EOS (requires empty string in ENUM; default=do)
-   -pack TEMPLATE       ##-- pack template for output ids (default='N')
-   -delim DELIM         ##-- output token delimiter (default='')
-   -encoding ENC        ##-- input encoding (default=raw)
-   -output FILE         ##-- output file (default=STDOUT)
+   -encoding ENCODING ##-- set I/O encoding
+   -output OUTFILE    ##-- set output file
+
+ Perl Variables:
+   $infile : current file
+   $ttin   : input Lingua::TT::IO object
+   $infh   : input filehandle
+   $outfh  : output filehandle (select()ed)
+   $_      : current line (chomped)
+   @_      : current line fields (split)
 
 =cut
 
@@ -151,7 +147,6 @@ tt-pack.perl - encode tt files using pre-compiled enum
 =head1 OPTIONS
 
 =cut
-
 ###############################################################
 # General Options
 ###############################################################
@@ -226,3 +221,4 @@ Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
 perl(1).
 
 =cut
+

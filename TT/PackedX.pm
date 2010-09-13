@@ -1,18 +1,17 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::PackedZ.pm
+## File: Lingua::TT::PackedX.pm
 ## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
-## Descript: TT I/O: packed docs: using (our own) Encode::Base128
+## Descript: TT I/O: packed docs: human-readable ascii hexadecimal
 
-package Lingua::TT::PackedZ;
-use Lingua::TT::Packed;
-use Encode::Base128 qw(:all);
+package Lingua::TT::PackedX;
+use Lingua::TT::PackedA;
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
 
 #our @ISA = qw(Lingua::TT::Document);
-our @ISA = qw(Lingua::TT::Packed);
+our @ISA = qw(Lingua::TT::PackedA);
 
 ##==============================================================================
 ## Constructors etc.
@@ -21,19 +20,19 @@ our @ISA = qw(Lingua::TT::Packed);
 ## + %$pk, %opts:
 ##    data => $packed_data,  ##-- pack("$PACKFMT*",@ids)
 ##    enum => $enum,         ##-- for mapping text <-> id
-##    packfmt => $packfmt,   ##-- packing format (default='N') : IGNORED
+##    packfmt => $packfmt,   ##-- packing format (default='A*') : IGNORED
 ##    fast => $bool,         ##-- encode/decode in memory-intensive "fast" mode, without error checks
 ##    badid => $id,          ##-- optional id to use for missing symbols (default=undef ~ 0)
 ##    badsym => $sym,        ##-- optional symbol to use for missing ids (default=undef ~ '')
-##    delim => $delimter,    ##-- record delimiter; default="\0" (NUL byte)
+##    delim => $delimter,    ##-- record delimiter; default="\n"
 sub new {
   my $that = shift;
   my $pz = $that->SUPER::new(
-			     delim   => "\0",
+			     delim   => "\n",
 			     @_,
-			     packfmt => 'w', ##-- just in case
+			     packfmt => 'A*', ##-- just in case
 			    );
-  $pz->{delim} = "\0" if (!defined($pz->{delim}) || $pz->{delim} eq '');
+  $pz->{delim} = "\n" if (!defined($pz->{delim}) || $pz->{delim} eq '');
   return $pz;
 }
 
@@ -48,12 +47,11 @@ sub ids {
   my $delim = $pk->{delim} || "\0";
   if ($ids) {
     ##-- set, +delim
-    $pk->{data}  = '';
-    $pk->{data} .= b128_encode($_).$delim foreach (@$ids);
+    $pk->{data}  = join($delim,map {sprintf("%x",$_)} @$ids).$delim;
   }
   else {
     my $delim_re = qr/\Q$delim\E/;
-    $ids = [map {b128_decode($_)} split($delim_re,$pk->{data})];
+    $ids = [map {hex($_)} split($delim_re,$pk->{data})];
   }
   return $ids;
 }
@@ -81,11 +79,11 @@ sub packIO {
   my $datar  = \$pk->{data};
   my $packfmt = $pk->{packfmt};
   my $badid   = $pk->{badid};
-  my $delim   = $pk->{delim} || "\0";
+  my $delim   = $pk->{delim} || "\n";
 
   if ($pk->{fast}) {
     ##-- "fast" mode
-    $$datar .= b128_encode($_).$delim foreach (@$sym2id{map {chomp; $_} <$infh>});
+    $$datar .= sprintf("%x$delim",$_) foreach (@$sym2id{map {chomp; $_} <$infh>});
   } else {
     ##-- "paranoid" mode
     my ($id,$badid);
@@ -101,7 +99,7 @@ sub packIO {
 	  $id = $enum->getId($_);
 	}
       }
-      $$datar .= b128_encode($id).$delim;
+      $$datar .= sprintf("%x$delim",$id);
     }
   }
   return $pk;
@@ -122,12 +120,12 @@ sub unpackIO {
   my $datar  = \$pk->{data};
   my $badsym = $pk->{badsym};
   my $packfmt = $pk->{packfmt};
-  my $delim   = $pk->{delim} || "\0";
+  my $delim   = $pk->{delim} || "\n";
   my $delim_re = qr/\Q$delim\E/;
 
   if ($pk->{fast}) {
     ##-- unpack: fast mode
-    $outfh->print(map {$_."\n"} @$id2sym[map {b128_decode($_)} split($delim_re,$$datar)]);
+    $outfh->print(map {$_."\n"} @$id2sym[map {hex($_)} split($delim_re,$$datar)]);
   }
   else {
     ##-- unpack: "paranoid" mode
@@ -144,7 +142,9 @@ sub unpackIO {
 		      }
 		    }
 		    $sym."\n"
-		  } map {b128_decode($_)} split($delim_re,$$datar) ##-- -fast,+delim
+		  }
+		  map {hex($_)}
+		  split($delim_re,$$datar) ##-- -fast,+delim
 		 );
   }
 

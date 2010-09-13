@@ -35,6 +35,14 @@ sub new {
     require Lingua::TT::PackedZ;
     return Lingua::TT::PackedZ->new(%opts);
   }
+  elsif ($opts{packfmt} && $opts{packfmt} eq 'a') {
+    require Lingua::TT::PackedA;
+    return Lingua::TT::PackedA->new(%opts);
+  }
+  elsif ($opts{packfmt} && $opts{packfmt} eq 'x') {
+    require Lingua::TT::PackedX;
+    return Lingua::TT::PackedX->new(%opts);
+  }
   return bless({
 		data    => '',
 		enum    => Lingua::TT::Enum->new,
@@ -74,6 +82,7 @@ sub ids {
   if ($ids) {
     if ($delim) {
       ##-- set, +delim
+      $pk->{data}  = '';
       $pk->{data} .= pack($pk->{packfmt},$_).$delim foreach (@$ids);
     } else {
       ##-- set, -delim
