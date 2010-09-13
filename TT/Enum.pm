@@ -59,7 +59,8 @@ sub getId {
 
 ## $id = $enum->getSym($id)
 ##  + gets (possibly new (and if so, "SYM${i}")) symbol for $id
-sub getSym {
+BEGIN { *getSym = \&getSymbol; };
+sub getSymbol {
   return $_[0]{id2sym}[$_[1]] if ($_[1] < $_[0]{size});
   $_[0]{sym2id}{"SYM$_[1]"} = $_[1];
   return $_[0]{id2sym}[$_[1]] = "SYM$_[1]";

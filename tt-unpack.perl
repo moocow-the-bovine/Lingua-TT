@@ -3,6 +3,7 @@
 use lib '.';
 use Lingua::TT;
 use Lingua::TT::Enum;
+use Lingua::TT::Packed;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -24,9 +25,12 @@ our $encoding     = undef;
 our $enumfile     = undef,
 our $enum_ids     = 0;
 
-our $packfmt = 'N';
-#our $delim = undef;
-our $fast = 0; ##-- "fast" mode? (really helps a bit here)
+our %packopts = (
+		 packfmt => 'N',
+		 badid => 0,
+		 badsym => '',
+		 fast => 0, ##-- -fast helps a lot for unpack()
+		);
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -37,14 +41,17 @@ GetOptions(##-- general
 	   'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
-	   'buffer|buf|fast!' => \$fast,
-	   'slow|paranoid' => sub { $fast=!$_[1]; },
+	   'buffer|buf|fast!' => \$packopts{fast},
+	   'slow|paranoid' => sub { $packopts{fast}=!$_[1]; },
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
 	   'enum-ids|ids|ei!' => \$enum_ids,
 
-	   'packfmt|pack|p=s' => \$packfmt,
-	   #'delim|d:s' => \$delim,
+	   'packfmt|pack|p=s' => \$packopts{packfmt},
+	   'badsym|bad|b=s' => \$packopts{badsym},
+	   'delimiter|delim|d:s' => \$packopts{delim},
+	   'delim-lines|lines|dl' => sub {$packopts{delim}="\n";},
+	   'delim-nul|delim-zero|nul|zero|dz' => sub {$packopts{delim}="\0";},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -76,53 +83,24 @@ our $enum = Lingua::TT::Enum->new();
 our %enum_io_opts = (encoding=>$encoding, noids=>(!$enum_ids));
 $enum = $enum->loadNativeFile($enumfile,%enum_io_opts)
     or die("$prog: coult not load enum file '$enumfile': $!");
-my $id2sym = $enum->{id2sym};
 
 ##-- guts
+our $pk = Lingua::TT::Packed->new(%packopts,enum=>$enum)
+  or die("$prog: could not create Packed object: $!");
+
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
   or die("$prog: open failed for output file '$outfile': $!");
-our $outfh = $ttout->{fh};
-
-##-- delimiter
-if (!defined($delim)) {
-  if ($packfmt eq 'w') { $delim = undef; }
-  else {
-    my $reclen = length(pack($packfmt,0));
-    $delim = \$reclen;
-  }
-}
-our $hibit = chr(128); ##-- == ~chr(128)
-
 
 push(@ARGV,'-') if (!@ARGV);
 foreach $infile (@ARGV) {
-  my $infh = IO::File->new("<$infile")
-    or die("$prog: open failed for input file '$infile': $!");
-
-  if ($fast || $packfmt eq 'w') {
-    ##-- fast mode
-    local $/=undef;
-    $buf = <$infh>;
-    $outfh->print(map {$_."\n"} @$id2sym[unpack("${packfmt}*",$buf)]);
-  }
-  else {
-    ##-- paranoid mode
-    local $/=$delim;
-    while (defined($_=<$infh>)) {
-      chomp;
-      #substr($_,length($_)-1) &= $lobits if ($packfmt eq 'w'); ##-- clear hight bit for 'w' format
-      $id = unpack($packfmt,$_);
-      $txt = $id2sym->[$id];
-      if (!defined($txt)) {
-	warn("$prog: no enum symbol for id=$id; using empty string");
-	$txt = '';
-      }
-      $outfh->print($txt,"\n");
-    }
-  }
-  $infh->close();
+  $pk->clearData();
+  $pk->loadFile($infile)
+    or die("$prog: could not load packed file '$infile': $!");
+  $pk->unpackIO($ttout)
+    or die("$prog: unpackIO() failed for packed file '$infile': $!");
 }
-$outfh->close();
+
+$ttout->close();
 
 
 __END__
@@ -149,8 +127,10 @@ tt-unpack.perl - decode packed tt files using pre-compiled enum
  Other Options:
    -fast                ##-- run in fast buffer mode with no error checks
    -paranoid            ##-- run in slow "paranoid" mode (default)
+   -badsym SYM          ##-- symbol to use for missing ids (default='')
    -ids  , -noids       ##-- do/don't expect ids in ENUM (default=don't)
    -pack TEMPLATE       ##-- pack template for output ids (default='N')
+   -delim DELIMITER     ##-- pack record delimiter (default='' (none))
    -encoding ENC        ##-- output encoding (default=raw)
    -output FILE         ##-- output file (default=STDOUT)
 
