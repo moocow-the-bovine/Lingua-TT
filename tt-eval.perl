@@ -22,6 +22,7 @@ our $verbose      = 0;
 
 our $encoding = undef; ##-- default encoding (?)
 our $code_byline = undef;
+our $doprint = 1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -35,6 +36,7 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'encoding|e:s' => \$encoding,
+	   'print|p!' => \$doprint,
 	  );
 
 pod2usage({-msg=>'Not enough arguments specified!',-exitval=>1,-verbose=>0}) if (@ARGV < 1);
@@ -85,6 +87,7 @@ sub {
     ##-- BEGIN user code
     ).$code_byline.q(;
     ##-- END user code
+    ).($doprint ? 'print join("\t",@_), "\n";' : '').q(
   }
 });
 vmsg(3,"$prog: DEBUG: User code sub\n",
@@ -128,6 +131,7 @@ tt-eval.perl - eval perl code for each line of .tt files
  Other Options:
    -encoding ENCODING ##-- set I/O encoding
    -output OUTFILE    ##-- set output file
+   -noprint           ##-- don't implicitly print @_
 
  Perl Variables:
    $infile : current file
@@ -135,7 +139,7 @@ tt-eval.perl - eval perl code for each line of .tt files
    $infh   : input filehandle
    $outfh  : output filehandle (select()ed)
    $_      : current line (chomped)
-   @_      : current line fields (split)
+   @_      : current line fields (split): auto-printed
 
 =cut
 
