@@ -115,6 +115,7 @@ foreach $i (0..$#ARGV) {
   $mergefh = fs_cmdfh("sort -m \"$file0s\" \"$file1s\" |");
 
   $ofile = $i==$#ARGV ? $outfile : fs_tmpfile;
+  vmsg(1,"$prog: OUT $ofile\n");
   open(OUT, ">$ofile")
     or die("$prog: open failed for ".($i==$#ARGV ? '' : 'intermediate ')."output file '$ofile': $!");
   our ($lastkey,$lastf) = (undef,0);
@@ -148,6 +149,7 @@ foreach $i (0..$#ARGV) {
 
   close($mergefh);
   close(OUT);
+  $file0s = $ofile;
 }
 
 ###############################################################
