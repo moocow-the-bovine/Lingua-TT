@@ -140,9 +140,11 @@ tt-pack.perl - encode tt files using pre-compiled enum
    -pack=n              ##-- 16-bit big-endian integers (overflow danger!)
    -pack=N              ##-- 32-bit big-endian integers (default)
    -pack=w              ##-- BER compressed integers (smallest)
-   -pack=z              ##-- delimited BER-compressed (like -pack=w    -delim="\0")
-   -pack=a              ##-- ASCII decimal dump       (like -pack="A*" -delim="\n")
-   -pack=x              ##-- ASCII hex dump           (uses sprintf())
+   -pack=a              ##-- "\n"-delimited ASCII %d dump (like -pack="A*" -delim="\n")
+   -pack=z              ##-- NUL-delimited BER ints       (like -pack=w    -delim="\0")
+   -pack=at             ##-- "\n"-delimited ASCII %d dump with tt-style newlines
+   -pack=zt             ##-- "\n"-delimited BER ints with tt-style newlines
+   #-pack=x              ##-- ASCII hex dump           (uses sprintf())
 
 =cut
 

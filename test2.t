@@ -5,4 +5,5 @@ Baz
 bonk
 bloop
 blappo
-.
+.	$.
+

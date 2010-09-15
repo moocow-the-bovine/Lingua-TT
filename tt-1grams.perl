@@ -94,6 +94,7 @@ sub processFile {
 ## MAIN
 ##----------------------------------------------------------------------
 
+push(@ARGV,'-') if (!@ARGV);
 our @infiles = $globargs ? (map {glob($_)} @ARGV) : @ARGV;
 if ($listargs) {
   ##-- @infiles are file-lists: expand
@@ -110,7 +111,7 @@ if ($listargs) {
 
 ##-- guts
 foreach $ttfile (@infiles) {
-  vmsg(1,"$prog: tt: $ttfile\n");
+  vmsg(2,"$prog: tt: $ttfile\n");
   processFile($ttfile);
 }
 

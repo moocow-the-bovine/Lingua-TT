@@ -32,16 +32,24 @@ our @ISA = qw(Lingua::TT::Persistent);
 sub new {
   my ($that,%opts) = @_;
   if ($opts{packfmt} && $opts{packfmt} eq 'z') {
-    require Lingua::TT::PackedZ;
-    return Lingua::TT::PackedZ->new(%opts);
+    require Lingua::TT::Packed::z;
+    return Lingua::TT::Packed::z->new(%opts);
+  }
+  elsif ($opts{packfmt} && $opts{packfmt} eq 'zt') {
+    require Lingua::TT::Packed::zt;
+    return Lingua::TT::Packed::zt->new(%opts);
   }
   elsif ($opts{packfmt} && $opts{packfmt} eq 'a') {
-    require Lingua::TT::PackedA;
-    return Lingua::TT::PackedA->new(%opts);
+    require Lingua::TT::Packed::a;
+    return Lingua::TT::Packed::a->new(%opts);
+  }
+  elsif ($opts{packfmt} && $opts{packfmt} eq 'at') {
+    require Lingua::TT::Packed::at;
+    return Lingua::TT::Packed::at->new(%opts);
   }
   elsif ($opts{packfmt} && $opts{packfmt} eq 'x') {
-    require Lingua::TT::PackedX;
-    return Lingua::TT::PackedX->new(%opts);
+    require Lingua::TT::Packed::x;
+    return Lingua::TT::Packed::x->new(%opts);
   }
   return bless({
 		data    => '',

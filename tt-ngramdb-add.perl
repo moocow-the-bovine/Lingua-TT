@@ -22,11 +22,10 @@ our $prog         = basename($0);
 our $outfile_db   = undef; ##-- default: "$infile.db"
 our $verbose      = 0;
 
-our $pack_key = 'w';
+our $pack_key = 'w'; ##-- UNUSED
 our $pack_val = 'w';
 our $eos_id   = undef;
 our $append = 0; ##-- are we adding to an existing db?
-our $hex_input = 0;
 
 our %dbf    = (type=>'BTREE', flags=>O_RDWR|O_CREAT, dbopts=>{});
 our $cachesize = '128M';
@@ -41,13 +40,12 @@ GetOptions(##-- general
 
 	   ##-- Behavior
 	   'eos-id|ei:i' => \$eos_id,
-	   'hex-input|hex|x!' => \$hex_input,
 
 	   ##-- I/O
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'pack-key|pk|p:s' => \$pack_key,
-	   'pack-value|pack-val|pv:s' => \$pack_val,
+	   #'pack-key|pk|p:s' => \$pack_key,
+	   'pack-value|pack-val|pack|pv|p:s' => \$pack_val,
 	   'nopack|raw|P' => sub { $pack_key=$pack_val=undef; },
 	   'append|add|a!' => \$append,
 	   'truncate|trunc|clobber|t!' => sub { $append=!$_[1]; },
@@ -83,7 +81,7 @@ sub vmsg {
 
 ##-- defaults
 $outfile_db   = $ARGV[0].".db"  if (!defined($outfile_db));
-$pack_key .= '*' if ($pack_key && $pack_key !~ m/\*$/);
+#$pack_key .= '*' if ($pack_key && $pack_key !~ m/\*$/);
 
 ##-- open db
 if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
@@ -110,14 +108,22 @@ foreach $ngfile (@ARGV) {
 
   while (defined($_=<$infh>)) {
     next if (/^\%\%/ || /^\s*$/ || /__\$/); ##-- comment or blank line or moot-eos
-    @ids = split(/\t/,$_);
-    $f   = pop(@ids);
-    @ids = map {hex($_)} @ids if ($hex_input);
-    $key = $pack_key ? pack($pack_key,@ids) : join("\t",@ids);
-    $val = $data->{$key};
-    $val = unpack($pack_val,$val) if ($val && $pack_val);
-    $val += $f;
-    $data->{$key} = $pack_val ? pack($pack_val,$val) : $val;
+    if (/^(.*)\t([^\t\r\n]*)$/) {
+      ($key,$f)=($1,$2);
+    } else {
+      chomp;
+      warn("$prog: could not parse n-gram line '$_' - skipping");
+      next;
+    }
+    if (defined($val = $data->{$key})) {
+      if ($pack_val) {
+	$val = unpack($pack_val,$val);
+	$data->{$key} = pack($pack_val,$val+$f);
+      }
+    }
+    else {
+      $data->{$key} = $pack_val ? pack($pack_val,$f) : $f;
+    }
   }
 
   $ttin->close();
@@ -149,7 +155,7 @@ tt-ngramdb-add.perl - add n-gram counts for tt files to a Berkely db
    -eos-id ID                ##-- set EOS id (default=0)
 
  I/O Options:
-   -pack-key PACKFMT         ##-- set DB key pack format (default='w*')
+   #-pack-key PACKFMT         ##-- set DB key pack format (default='w*')
    -pack-val PACKFMT         ##-- set DB key pack format (default='w')
    -append  , -truncate      ##-- do/don't append to existing file(s) (default:-add)
    -db-hash , -db-btree      ##-- set output DB type (default='HASH')

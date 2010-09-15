@@ -1,9 +1,9 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::PackedZ.pm
+## File: Lingua::TT::Packed::z.pm
 ## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
 ## Descript: TT I/O: packed docs: using (our own) Encode::Base128
 
-package Lingua::TT::PackedZ;
+package Lingua::TT::Packed::z;
 use Lingua::TT::Packed;
 use Encode::Base128 qw(:all);
 use strict;
@@ -27,13 +27,11 @@ our @ISA = qw(Lingua::TT::Packed);
 ##    badsym => $sym,        ##-- optional symbol to use for missing ids (default=undef ~ '')
 ##    delim => $delimter,    ##-- record delimiter; default="\0" (NUL byte)
 sub new {
-  my $that = shift;
-  my $pz = $that->SUPER::new(
-			     delim   => "\0",
-			     @_,
-			     packfmt => 'w', ##-- just in case
-			    );
-  $pz->{delim} = "\0" if (!defined($pz->{delim}) || $pz->{delim} eq '');
+  my ($that,%opts) = @_;
+  $opts{delim}   = "\0" if (!$opts{delim});
+  $opts{packfmt} = 'w';
+  my $pz = $that->SUPER::new(%opts);
+  $pz->{delim} = "\n" if (!defined($pz->{delim}) || $pz->{delim} eq '');
   return $pz;
 }
 

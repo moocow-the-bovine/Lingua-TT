@@ -1,9 +1,9 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::PackedX.pm
+## File: Lingua::TT::Packed::x.pm
 ## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
 ## Descript: TT I/O: packed docs: human-readable ascii hexadecimal
 
-package Lingua::TT::PackedX;
+package Lingua::TT::Packed::x;
 use Lingua::TT::PackedA;
 use strict;
 
