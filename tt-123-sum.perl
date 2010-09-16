@@ -167,11 +167,11 @@ foreach $i (0..$#ARGV) {
 
 =head1 NAME
 
-tt-123-join.perl - join verbose n-gram files using system sort & merge
+tt-123-sum.perl - sum over verbose n-gram input files using system sort & merge
 
 =head1 SYNOPSIS
 
- tt-123-join.perl [OPTIONS] VERBOSE_123_FILE(s)...
+ tt-123-sum.perl [OPTIONS] [VERBOSE_123_FILE(s)...]
 
  General Options:
    -help
