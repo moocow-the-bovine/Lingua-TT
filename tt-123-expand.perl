@@ -6,6 +6,7 @@ use Pod::Usage;
 use File::Basename qw(basename);
 #use File::Copy;
 
+
 use lib '.';
 use Lingua::TT;
 use Lingua::TT::Sort qw(:all);
@@ -20,10 +21,9 @@ our $VERSION = "0.01";
 our $prog         = basename($0);
 our $outfile      = '-';
 our $verbose      = 0;
-
-our $sort0   = 1; ##-- sort first input file?
-our $sort1   = 1; ##-- sort other input file(s)?
-#our $keeptmp = 0; ##-- keep temp files?
+our $sort         = 0; ##-- sort input file(s)?
+our $merge        = 1; ##-- merge multiple sorted input file(s)?
+our $moot_eos_hack = 1; ##-- moot-compatible eos hack? (f(eos) := f(eos_prefix)+1)
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -35,11 +35,11 @@ GetOptions(##-- general
 	  'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
-	   'sort0|s0!' => \$sort0,
-	   'sort1|s1!' => \$sort1,
-	   'sort|s!' => sub { $sort0=$sort1=$_[1]; },
-	   'keeptmp|keep|k!' => \$FS_KEEP,
 	   'output|o=s' => \$outfile,
+	   'sort|s!' => \$sort,
+	   'merge|m!' => \$merge,
+	   'moot-eos-hack|eos-hack|eh!' => \$moot_eos_hack,
+	   'keeptmp|keep|k!' => \$FS_KEEP,
 	  );
 
 #pod2usage({-msg=>'Not enough arguments specified!',-exitval=>1,-verbose=>0}) if (@ARGV < 1);
@@ -63,52 +63,6 @@ sub vmsg {
 }
 
 ##----------------------------------------------------------------------
-sub sortsum {
-  my ($ifile,$ofile) = @_;
-
-  my $ifh = ref($ifile) ? $ifile : IO::File->new("<$ifile");
-  die("$prog: open failed for input file '$ifile': $!") if (!defined($ifh));
-
-  my $ofh = ref($ofile) ? $ofile : IO::File->new(">$ofile");
-  die("$prog: open failed for output file '$ofile': $!") if (!defined($ofh));
-
-  select($ofh);
-  our ($lastkey,$lastf) = (undef,0);
-  our ($key,$f);
-  while (defined($_=<$ifh>)) {
-    if (/^$/ || /^%%/) {
-      print $_;
-      next;
-    }
-    s/\r?\n?$//;
-    if (/^(.*)\t([^\t]*)$/) {
-      ($key,$f) = ($1,$2);
-    } else {
-      warn("$prog: could not parse merged line '$_'; skipping");
-      next;
-    }
-
-    if (!defined($lastkey)) {
-      ($lastkey,$lastf) = ($key,$f);
-    }
-    elsif ($key eq $lastkey) {
-      $lastf += $f;
-    }
-    else {
-      print $lastkey, "\t", $lastf, "\n";
-      ($lastkey,$lastf) = ($key,$f);
-    }
-  }
-  if (defined($lastkey)) {
-    print $lastkey, "\t", $lastf, "\n";
-  }
-
-  close($ifh) if (!ref($ifile));
-  close($ofh) if (!ref($ofile));
-  return 1;
-}
-
-##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
@@ -118,45 +72,61 @@ push(@ARGV,'-') if (@ARGV < 1);
 $ENV{LC_ALL} = 'C';
 $FS_VERBOSE = $verbose;
 
-##-- sort initial input file(s)
-our $file0 = shift(@ARGV);
-our $file0s = $sort0 ? fs_filesort($file0) : $file0;
-our $ofile0 = $sort0 ? undef : $file0s;
-
-if (!@ARGV) {
-  ##-- just sum over a single (sorted) file
-  sortsum($file0s,$outfile) || exit 1;
-  exit 0;
+##-- sort input file(s)
+our @in0 = @ARGV;
+our (@in1);
+if ($sort) {
+  @in1 = fs_filesort(@in0);
+} elsif ($merge) {
+  @in1 = fs_filemerge(@in0);
+} else {
+  @in1 = @in0;
 }
 
-my ($ofile);
-foreach $i (0..$#ARGV) {
-  $file1  = $ARGV[$i];
-  $file1s = $sort1 ? fs_filesort($file1) : $file1;
-  $mergefh = fs_cmdfh("sort -m \"$file0s\" \"$file1s\" |");
+##-- open output file
+open(OUT,">$outfile")
+  or die("$prog: open failed for output file '$outfile': $!");
+select OUT;
 
-  $ofile = $i==$#ARGV ? $outfile : fs_tmpfile;
-  vmsg(2,"$prog: ".($i==$#ARGV ? 'OUT' : 'TMP')." $ofile\n");
-  open(OUT, ">$ofile")
-    or die("$prog: open failed for ".($i==$#ARGV ? '' : 'intermediate ')."output file '$ofile': $!");
+foreach $infile (@in1) {
+  open(IN,"<$infile")
+    or die("$prog: open failed for (sorted) input file '$infile': $!");
 
-  ##-- sort
-  sortsum($mergefh,\*OUT)
-    or die("$prog: sort sum failed for '$file1' (sorted='$file1s') to '$ofile': $!");
+  our @prf = qw(); ##-- $prefixI => [$prefixKey,$prefixF]
+  while (defined($_=<IN>)) {
+    if (/^%%/ || /^$/) {
+      ##-- pass through comments and blank lines
+      print $_;
+      next;
+    }
+    chomp;
 
-  ##-- unlink temps
-  if (defined($file0s) && $file0s ne $file0) {
-    vmsg(2,"$prog: UNLINK $file0s\n");
-    unlink($file0s);
-    $file0s = undef;
+    ##-- check for prefixes
+    @key = split(/\t/,$_);
+    $f   = pop(@key);
+    foreach $pi (0..$#key) {
+      if (!$prf[$pi] || $prf[$pi][0] ne $key[$pi]) {
+	##-- prefix mismatch: dump remaining buffered prefix data
+	foreach $pj (reverse $pi..$#prf) {
+	  $prf[0][1]++ if ($moot_eos_hack && $pi==0 && $pj==0 && $prf[0][0] eq '__$');
+	  print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
+	}
+	splice(@prf,$pi,@prf-$pi,map {[$_,$f]} @key[$pi..$#key]);
+	last;
+      }
+      else {
+	##-- prefix match: add current freq
+	$prf[$pi][1] += $f;
+      }
+    }
   }
-  if ($sort1 && !$FS_KEEP) {
-    vmsg(2,"$prog: UNLINK $file1s\n");
-    unlink($file1s);
+  ##-- end of file: dump any remaining prefixes
+  foreach $pj (reverse 0..$#prf) {
+    $prf[0][1]++ if ($moot_eos_hack && $pj==0 && $prf[0][0] eq '__$');
+    print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
   }
 
-  ##-- update
-  $file0s = $ofile;
+  close(IN);
 }
 
 ###############################################################
@@ -167,11 +137,11 @@ foreach $i (0..$#ARGV) {
 
 =head1 NAME
 
-tt-123-join.perl - join verbose n-gram files using system sort & merge
+tt-123-expand.perl - expand all (k<=n)-grams in verbose n-gram files
 
 =head1 SYNOPSIS
 
- tt-123-join.perl [OPTIONS] VERBOSE_123_FILE(s)...
+ tt-123-expand.perl [OPTIONS] VERBOSE_123_FILE(s)...
 
  General Options:
    -help
@@ -179,10 +149,11 @@ tt-123-join.perl - join verbose n-gram files using system sort & merge
    -verbose LEVEL
 
  Other Options:
-   -sort0 , -nosort0  ##-- do/don't sort first input file    (default=do)
-   -sort1 , -nosort1  ##-- do/don't sort other input file(s) (default=do)
-   -sort  , -nosort   ##-- shortcut fot -[no]sort0 -[no]sort1
+   -sort  , -nosort   ##-- do/don't sort all inputs (default=don't)
+   -merge , -nomerge  ##-- do/don't merge sorted inputs (default=do)
    -keep  , -nokeep   ##-- do/don't keep temporary files (default=don't)
+   -moot-eos-hack     ##-- for moot, set f(__$) := sum(f(* __$))+1 [default]
+   -no-eos-hack       ##-- disable moot eos hack
    -output OUTFILE    ##-- set output file (default=STDOUT)
 
 =cut

@@ -1,0 +1,16 @@
+#!/usr/bin/awk -f
+
+BEGIN	{
+    if (ARGC < 1) {
+	print "Usage: tt-123-eos-expand.awk TT_FILE(s)..." > "/dev/stderr"
+	print " + removes '__$' bigrams from expanded mootrain verbose .123 files" > "/dev/stderr"
+	exit 1;
+    }
+    FS="\t";
+    OFS="\t";
+}
+/^$/    { print $0; next }
+/^%%/   { print $0; next }
+/^__\$\t__\$\t/ { next; }  ##-- initial eos bigrams
+/\t__\$\t__\$\t/ { next; } ##-- non-initial eos bigrams
+{ print $0; }
