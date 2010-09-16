@@ -9,7 +9,7 @@ use File::Basename qw(basename);
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Sort qw(:all);
+#use Lingua::TT::Sort qw(:all);
 
 ##----------------------------------------------------------------------
 ## Globals
@@ -21,9 +21,8 @@ our $VERSION = "0.01";
 our $prog         = basename($0);
 our $outfile      = '-';
 our $verbose      = 0;
-our $sort         = 0; ##-- sort input file(s)?
-our $merge        = 1; ##-- merge multiple sorted input file(s)?
-our $moot_eos_hack = 1; ##-- moot-compatible eos hack? (f(eos) := f(eos_prefix)+1)
+#our $sort         = 0; ##-- sort input file(s)?
+#our $merge        = 1; ##-- merge multiple sorted input file(s)?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -36,10 +35,6 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'sort|s!' => \$sort,
-	   'merge|m!' => \$merge,
-	   'moot-eos-hack|eos-hack|eh!' => \$moot_eos_hack,
-	   'keeptmp|keep|k!' => \$FS_KEEP,
 	  );
 
 #pod2usage({-msg=>'Not enough arguments specified!',-exitval=>1,-verbose=>0}) if (@ARGV < 1);
@@ -69,30 +64,19 @@ sub vmsg {
 push(@ARGV,'-') if (@ARGV < 1);
 
 ##-- force strict lexical ordering
-$ENV{LC_ALL} = 'C';
-$FS_VERBOSE = $verbose;
-
-##-- sort input file(s)
-our @in0 = @ARGV;
-our (@in1);
-if ($sort) {
-  @in1 = fs_filesort(@in0);
-} elsif (@ARGV > 1 && $merge) {
-  @in1 = fs_filemerge(@in0);
-} else {
-  @in1 = @in0;
-}
+#$ENV{LC_ALL} = 'C';
+#$FS_VERBOSE = $verbose;
 
 ##-- open output file
 open(OUT,">$outfile")
   or die("$prog: open failed for output file '$outfile': $!");
 select OUT;
 
-foreach $infile (@in1) {
+foreach $infile (@ARGV) {
   open(IN,"<$infile")
-    or die("$prog: open failed for (sorted) input file '$infile': $!");
+    or die("$prog: open failed for input file '$infile': $!");
 
-  our @prf = qw(); ##-- $prefixI => [$prefixKey,$prefixF]
+  our @prf = qw(); ##-- $prefixI => $prefixKey
   while (defined($_=<IN>)) {
     if (/^%%/ || /^$/) {
       ##-- pass through comments and blank lines
@@ -101,29 +85,21 @@ foreach $infile (@in1) {
     }
     chomp;
 
-    ##-- check for prefixes
+    ##-- split to key & freq
     @key = split(/\t/,$_);
     $f   = pop(@key);
+
+    ##-- copy shared prefixes
     foreach $pi (0..$#key) {
-      if (!$prf[$pi] || $prf[$pi][0] ne $key[$pi]) {
-	##-- prefix mismatch: dump remaining buffered prefix data
-	foreach $pj (reverse $pi..$#prf) {
-	  $prf[0][1]++ if ($moot_eos_hack && $pi==0 && $pj==0 && $prf[0][0] eq '__$');
-	  print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
-	}
-	splice(@prf,$pi,@prf-$pi,map {[$_,$f]} @key[$pi..$#key]);
-	last;
-      }
-      else {
-	##-- prefix match: add current freq
-	$prf[$pi][1] += $f;
-      }
+      last if ($key[$pi] ne '');
+      $key[$pi] = $prf[$pi];
     }
-  }
-  ##-- end of file: dump any remaining prefixes
-  foreach $pj (reverse 0..$#prf) {
-    $prf[0][1]++ if ($moot_eos_hack && $pj==0 && $prf[0][0] eq '__$');
-    print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
+
+    ##-- dump
+    print join("\t", @key, $f), "\n";
+
+    ##-- update
+    @prf = @key;
   }
 
   close(IN);
@@ -137,11 +113,11 @@ foreach $infile (@in1) {
 
 =head1 NAME
 
-tt-123-expand.perl - expand all (k<=n)-grams in verbose n-gram files
+tt-123-uncompact.perl - un-compact prefix-encoded (k<=n)-grams in moot .123 files
 
 =head1 SYNOPSIS
 
- tt-123-expand.perl [OPTIONS] VERBOSE_123_FILE(s)...
+ tt-123-uncompact.perl [OPTIONS] 123_FILE(s)...
 
  General Options:
    -help
@@ -149,11 +125,6 @@ tt-123-expand.perl - expand all (k<=n)-grams in verbose n-gram files
    -verbose LEVEL
 
  Other Options:
-   -sort  , -nosort   ##-- do/don't sort all inputs (default=don't)
-   -merge , -nomerge  ##-- do/don't merge sorted inputs (default=do)
-   -keep  , -nokeep   ##-- do/don't keep temporary files (default=don't)
-   -moot-eos-hack     ##-- for moot, set f(__$) := sum(f(* __$))+1 [default]
-   -no-eos-hack       ##-- disable moot eos hack
    -output OUTFILE    ##-- set output file (default=STDOUT)
 
 =cut
