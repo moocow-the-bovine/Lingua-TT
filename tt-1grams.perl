@@ -29,6 +29,8 @@ our $listargs = 0; ##-- args are file-lists?
 our $want_cmts = 1;
 our $eos       = '';
 our $sort      = 'freq'; ##-- one of qw(freq lex none)
+our $union     = 0;      ##-- union mode?
+our $ugfile0   = undef;  ##-- initial unigram file
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -41,6 +43,8 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'glob|g!' => \$globargs,
 	   'list|l!' => \$listargs,
+	   'initial-unigrams|init|i=s' => \$ugfile0,
+	   'merge|sum|union|u' => \$union,
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
 	   'comments|cmts|c!' => \$want_cmts,
@@ -74,7 +78,8 @@ sub vmsg {
 ## subs: guts
 our %wf = qw(); ##-- $text => $freq, ...
 our $ug = Lingua::TT::Unigrams->new(wf=>\%wf);
-sub processFile {
+
+sub processTTFile {
   my $ttfile = shift;
   my $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>$encoding)
     or die("$0: open failed for input file '$ttfile': $!");
@@ -90,9 +95,21 @@ sub processFile {
   $infh->close();
 }
 
+sub process1gFile {
+  my $file = shift;
+  $ug->loadFile($file,encoding=>$encoding)
+    or die("$0: could not load 1-gram file from '$file': $!");
+  return $ug;
+}
+
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
+
+if (defined($ugfile0)) {
+  vmsg(2,"$prog: 1g: $ttfile\n");
+  processUgFile($ugfile0);
+}
 
 push(@ARGV,'-') if (!@ARGV);
 our @infiles = $globargs ? (map {glob($_)} @ARGV) : @ARGV;
@@ -111,8 +128,13 @@ if ($listargs) {
 
 ##-- guts
 foreach $ttfile (@infiles) {
-  vmsg(2,"$prog: tt: $ttfile\n");
-  processFile($ttfile);
+  if (!$union) {
+    vmsg(2,"$prog: tt: $ttfile\n");
+    processTTFile($ttfile);
+  } else {
+    vmsg(2,"$prog: 1g: $ttfile\n");
+    process1gFile($ttfile);
+  }
 }
 
 ##-- save
@@ -141,9 +163,11 @@ tt-1grams.perl - get unigrams from TT file(s)
    -verbose LEVEL
 
  Other Options:
+   -union, -nounion     ##-- TTFILE argument(s) are/aren't really unigram files (default=no)
    -list , -nolist      ##-- TTFILE argument(s) are/aren't file-lists (default=no)
    -glob , -noglob      ##-- do/don't glob TTFILE argument(s) (default=do)
    -cmts , -nocmts      ##-- do/don't count comments (default=don't)
+   -init 1GFILE         ##-- initialize unigrams from 1GFILE (default=none)
    -eos EOS             ##-- count eos as string EOS (default='')
    -noeos               ##-- do/don't count EOS at all
    -freqsort            ##-- sort output by frequency (default)
