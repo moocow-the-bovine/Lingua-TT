@@ -29,6 +29,8 @@ use strict;
 ##                             ##   + uses perlio :encoding($encoding) layer
 ##                             ##   + undef (default) uses perl default (locale?)
 ##                             ##   + undef gives fastest I/O, since no translation is required
+##                             ##   + pseudo-encoding 'raw' sets ':raw' layer
+##                             ##   + false encodings (0,'') set no perlIO flags at all
 ##     fh       => $fh,        ##-- underlying filehandle (default: none)
 ##     name     => $name,      ##-- source name to use for error reporting (defualt: none)
 ##    )
@@ -78,7 +80,13 @@ sub open {
     $io->{fh} = IO::File->new($mode.$src)
       or confess(ref($io)."::open(): open failed with mode '$mode' for file '$src': $!");
   }
-  binmode($io->{fh},":encoding($io->{encoding})") if ($io->{encoding});
+  if ($io->{encoding}) {
+    if ($io->{encoding} eq 'raw') {
+      binmode($io->{fh}, ':raw');
+    } else {
+      binmode($io->{fh},":encoding($io->{encoding})");
+    }
+  }
   return $io;
 }
 
