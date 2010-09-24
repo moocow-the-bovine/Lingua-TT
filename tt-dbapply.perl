@@ -2,6 +2,8 @@
 
 use lib '.';
 use Lingua::TT;
+use Lingua::TT::DB::File;
+use Fcntl;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
