@@ -12,7 +12,7 @@ use File::Basename qw(basename);
 ##----------------------------------------------------------------------
 
 our $VERSION  = "0.01";
-our $encoding = "UTF-8";
+our $encoding = undef;
 our $outfile  = '-';
 
 ##----------------------------------------------------------------------
@@ -33,38 +33,72 @@ pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
+## Subs
+
+our (%dict);
+
+#BEGIN { *readDictFile = \&readDictFile_doc; }
+sub readDictFile_doc {
+  my $dictfile = shift;
+  my $ttin = Lingua::TT::IO->fromFile($dictfile,encoding=>$encoding)
+    or die("$0: open failed for '$dictfile': $!");
+  my $dictdoc = $ttin->getDocument;
+  $ttin->close;
+  %dict = map {($_->[0]=>$_)} grep {$_->isVanilla} map {@$_} @$dictdoc;
+  return;
+}
+
+BEGIN { *readDictFile = \&readDictFile_raw; }
+sub readDictFile_raw {
+  my $dictfile = shift;
+  my $ttin = Lingua::TT::IO->fromFile($dictfile,encoding=>$encoding)
+    or die("$0: open failed for '$dictfile': $!");
+  my $infh = $ttin->{fh};
+  my ($key,$val);
+  while (defined($_=<$infh>)) {
+    chomp;
+    next if (/^$/ || /^\%\%/);
+    ($key,$val) = split(/\t/,$_,2);
+    next if (!defined($val));
+    $dict{$key} = $val;
+  }
+  $ttin->close;
+  return;
+}
+
+
+##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
 ##-- i/o
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
   or die("$0: open failed for '$outfile': $!");
+our $outfh = $ttout->{fh};
 
 ##-- read type dict
 my $dictfile = shift(@ARGV);
-our $ttin = Lingua::TT::IO->fromFile($dictfile,encoding=>$encoding)
-  or die("$0: open failed for '$dictfile': $!");
-my $dictdoc = $ttin->getDocument;
-$ttin->close;
-our %dict = map {($_->[0]=>$_)} grep {$_->isVanilla} map {@$_} @$dictdoc;
+readDictFile($dictfile);
 
 ##-- process token files
-my ($tok);
 foreach $infile (@ARGV ? @ARGV : '-') {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
     or die("$0: open failed for '$infile': $!");
+  $infh = $ttin->{fh};
 
-  while (defined($tok=$ttin->getToken)) {
-    next if (!$tok->isVanilla);
-    if (defined($dtok=$dict{$tok->[0]})) {
-      push(@$tok,@$dtok[1..$#$dtok]);
-    }
-    #else { warn("$0: no dictionary entry for input token text '$tok->[0]'"); }
+  while (defined($_=<$infh>)) {
+    next if (/^%%/ || /^$/);
+    chomp;
+    ($text,$a_in) = split(/\t/,$_,2);
+    $a_dict = $dict{$text};
+    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
   }
   continue {
-    $ttout->putToken($tok);
+    $outfh->print($_);
   }
+  $ttin->close;
 }
+
 
 __END__
 
