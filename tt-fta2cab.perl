@@ -75,7 +75,7 @@ foreach $infile (@ARGV) {
     chomp;
     ($f,$t,@a) = split(/\t/,$_);
     $t = '' if (!defined($t));
-    $outfh->print(join("\t",$t,"[freq] $f",map {/^\[[^\]\] / ? $_ : ($ta_prefix.$_)} @a),"\n");
+    $outfh->print(join("\t",$t,"[freq] $f",map {/^\[[^\]]+\] / ? $_ : ($ta_prefix.$_)} @a),"\n");
   }
 }
 $ttout->close();
