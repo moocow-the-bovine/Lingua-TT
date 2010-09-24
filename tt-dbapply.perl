@@ -11,9 +11,14 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
+our $prog = basename($0);
 our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = '-';
+
+our $include_empty = 0;
+our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{});
+our $cachesize     = '128M';
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -23,6 +28,12 @@ GetOptions(##-- general
 	   #'man|m'  => \$man,
 	   #'version|V' => \$version,
 	   #'verbose|v=i' => \$verbose,
+
+	   ##-- db options
+	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
+	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-cachesize|db-cache|cache|c=s' => \$cachesize,
+	   'db-option|O=s' => $dbf{dbopts},
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -35,52 +46,35 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 ##----------------------------------------------------------------------
 ## Subs
 
-our (%dict);
-
-#BEGIN { *readDictFile = \&readDictFile_doc; }
-sub readDictFile_doc {
-  my $dictfile = shift;
-  my $ttin = Lingua::TT::IO->fromFile($dictfile,encoding=>$encoding)
-    or die("$0: open failed for '$dictfile': $!");
-  my $dictdoc = $ttin->getDocument;
-  $ttin->close;
-  %dict = map {($_->[0]=>$_)} grep {$_->isVanilla} map {@$_} @$dictdoc;
-  return;
-}
-
-BEGIN { *readDictFile = \&readDictFile_raw; }
-sub readDictFile_raw {
-  my $dictfile = shift;
-  my $ttin = Lingua::TT::IO->fromFile($dictfile,encoding=>$encoding)
-    or die("$0: open failed for '$dictfile': $!");
-  my $infh = $ttin->{fh};
-  my ($key,$val);
-  while (defined($_=<$infh>)) {
-    chomp;
-    next if (/^$/ || /^\%\%/);
-    ($key,$val) = split(/\t/,$_,2);
-    next if (!defined($val));
-    $dict{$key} = $val;
-  }
-  $ttin->close;
-  return;
-}
-
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
-##-- i/o
+
+##-- open db
+my $dbfile = shift(@ARGV);
+if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
+  my ($size,$suff) = ($1,$2);
+  $suff = 'B' if (!defined($suff));
+  $size *= 1024    if ($suff eq 'K');
+  $size *= 1024**2 if ($suff eq 'M');
+  $size *= 1024**3 if ($suff eq 'G');
+  $size *= 1024**4 if ($suff eq 'T');
+  $dbf{dbopts}{cachesize} = $size;
+}
+our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$dbfile)
+  or die("$prog: could not open or create DB file '$outfile': $!");
+our $data = $dbf->{data};
+#our $tied = $dbf->{tied};
+
+##-- open output handle
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
   or die("$0: open failed for '$outfile': $!");
 our $outfh = $ttout->{fh};
 
-##-- read type dict
-my $dictfile = shift(@ARGV);
-readDictFile($dictfile);
-
-##-- process token files
+##-- process inputs
+our ($text,$a_in,$a_dict);
 foreach $infile (@ARGV ? @ARGV : '-') {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
     or die("$0: open failed for '$infile': $!");
@@ -90,7 +84,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     next if (/^%%/ || /^$/);
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
-    $a_dict = $dict{$text};
+    $a_dict = $data->{$text};
     $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
   }
   continue {
@@ -98,6 +92,9 @@ foreach $infile (@ARGV ? @ARGV : '-') {
   }
   $ttin->close;
 }
+
+$dbf->close;
+$ttout->close;
 
 
 __END__
@@ -110,16 +107,19 @@ __END__
 
 =head1 NAME
 
-tt-dictapply.perl - apply text-keyed dictionary analyses to TT file(s)
+tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
 
 =head1 SYNOPSIS
 
- tt-dictapply.perl [OPTIONS] DICT_FILE [TT_FILE(s)]
+ tt-dbapply.perl [OPTIONS] DB_FILE [TT_FILE(s)]
 
  General Options:
    -help
-   #-version
-   #-verbose LEVEL
+
+ DB Options:
+  -hash   , -btree      ##-- select DB output type (default='BTREE')
+  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
+  -db-option OPT=VAL    ##-- set DB_File option
 
  I/O Options:
    -output FILE         ##-- default: STDOUT

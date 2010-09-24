@@ -13,6 +13,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
+our $prog = basename($0);
 our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = undef; ##-- default: INFILE.db
@@ -70,8 +71,8 @@ if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/)
   $dbf{dbopts}{cachesize} = $size;
 }
 $dbf{flags} |=  O_TRUNC if (!$append);
-our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile_db)
-  or die("$prog: could not open or create DB file '$outfile_db': $!");
+our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile)
+  or die("$prog: could not open or create DB file '$outfile': $!");
 our $data = $dbf->{data};
 our $tied = $dbf->{tied};
 
@@ -92,6 +93,8 @@ foreach $infile (@ARGV) {
   $ttin->close;
 }
 
+undef $tied;
+undef $data;
 $dbf->close;
 
 __END__
@@ -116,9 +119,9 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
  DB_File Options:
   -hash   , -btree      ##-- select DB output type (default='BTREE')
   -append , -truncate   ##-- do/don't append to existing db (default=-append)
+  -empty  , -noempty    ##-- do/don't create records for empty analyses
   -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
   -db-option OPT=VAL    ##-- set DB_File option
-  -empty  , -noempty    ##-- do/don't create records for empty analyses
 
  I/O Options:
    -output FILE         ##-- default: STDOUT
