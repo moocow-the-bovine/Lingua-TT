@@ -25,7 +25,8 @@ our $bytoken      = 0;
 
 our $verbose      = 1;
 
-our %ioargs = (encoding=>'UTF-8');
+#our %ioargs = (encoding=>'UTF-8');
+our %ioargs = qw();
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -41,7 +42,8 @@ GetOptions(##-- general
 	   'bysentence|bysent|sentence|s!' => sub { $bytoken = !$_[1]; },
 	   'frac1|f1|f=f' => \$frac1,
 	   'n1|n=i' => \$n1,
-	   'srand|r=i' => \$srand,
+	   'srand|seed|r=i' => \$srand,
+	   'noseed|random|rand' => sub { undef($srand); },
 
 	   ##-- I/O
 	   'output1|o1=s' => \$outfile1,
@@ -79,6 +81,19 @@ sub vmsg {
   print STDERR (@_) if ($verbose >= $level);
 }
 
+## dumpSentence()
+our ($buf,$ntoks,$nsents,$outi,@outfh,$pntoks,@ntoks,@nsents);
+sub dumpSentence {
+  --$ntoks;
+  ++$nsents;
+  $outi = (rand() <= $frac1 ? 0 : 1);
+  $outfh[$outi]->print($buf);
+  $ntoks[$outi] += ($ntoks-$pntoks);
+  $nsents[$outi]++;
+  $pntoks = $ntoks;
+  $buf = '';
+}
+
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
@@ -87,55 +102,40 @@ push(@ARGV, '-') if (!@ARGV);
 ##-- set random seed
 srand($srand) if (defined($srand));
 
-##-- read in source file
+##-- open output file(s)
+our $ttout1 = Lingua::TT::IO->toFile($outfile1,%ioargs)
+  or die("$0: open failed for '$outfile1': $!");
+our $ttout2 = Lingua::TT::IO->toFile($outfile2,%ioargs)
+  or die("$0: open failed for '$outfile2': $!");
+@outfh  = ($ttout1->{fh},$ttout2->{fh});
+
+##-- read in source file(s)
 my ($ttin);
-our $doc = Lingua::TT::Document->new();
-our $ntoks = 0;
-my ($docin);
+$pntoks = 0;
+$ntoks  = 0;
+$nsents = 0;
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for file '$infile': $!");
-  $docin = $ttin->getDocument;
-  push(@$doc,@$docin)
+  our $infh = $ttin->{fh};
+  $buf   = '';
+  while (defined($line=<$infh>)) {
+    $buf .= $line;
+    ++$ntoks;
+    dumpSentence if ($line =~ /^$/);
+  }
+  dumpSentence if ($buf);
 }
-
-##-- stats
-$nsents = $doc->nSentences;
-$ntoks  = $doc->nTokens;
-$nitems = $bytoken ? $ntoks : $nsents;
-$n1     = $frac1 * $nitems if (defined($frac1));
 
 ##-- report
 print STDERR
   ("$progname: got $ntoks tokens in $nsents sentences total\n",
   );
 
-##-- output: file 1
-$ntoks1 = $nsents1 = 0;
-our $ttout1 = Lingua::TT::IO->toFile($outfile1,%ioargs)
-  or die("$0: open failed for '$outfile1': $!");
-while (@$doc && $n1 > 0) {
-  $si = int(rand(@$doc));
-  $s  = splice(@$doc,$si,1);
-  $ttout1->putSentence($s);
-
-  ##-- count number of tokens in output files
-  $ntoks1 += @$s;
-  $nsents1++;
-
-  $n1 -= $bytoken ? scalar(@$s) : 1;
-}
-$ttout1->close;
-
-##-- print all remaining sentences as-is to $outfile2
-$ttout2 = Lingua::TT::IO->toFile($outfile2,%ioargs)
-  or die("$0: open failed for '$outfile2': $!");
-$ttout2->putDocument($doc);
-$ttout2->close();
-
 ##-- Summarize
-$ntoks2  = $ntoks - $ntoks1;
-$nsents2 = $nsents - $nsents1;
+our $nitems = $bytoken ? $ntoks : $nsents;
+our ($ntoks1,$ntoks2) = @ntoks;
+our ($nsents1,$nsents2) = @nsents;
 
 $flen = length($outfile1) > length($outfile2) ? length($outfile1) : length($outfile2);
 $ilen = length($ntoks);
@@ -178,6 +178,7 @@ tt-split-2.perl - split up .t, .tt, and .ttt files into two parts
    -frac    FLOAT          ##-- fraction of total items for -output1
    -n       NSENTS         ##-- absolute number of total items for -output1
    -srand   SEED           ##-- default: none (perl default)
+   -noseed                 ##--  ... truly random
 
  I/O Options:
    -output1 OUTFILE1
