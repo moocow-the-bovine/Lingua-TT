@@ -89,6 +89,27 @@ sub close {
   return $dbf;
 }
 
+## \%opts = $dbf->parseOptions(\%opts=$dbf->{dbopts})
+sub parseOptions {
+  my ($dbf,$dbopts) = @_;
+  $dbopts = $dbf->{dbopts} if (!$dbopts);
+  $dbopts = $dbf->{dbopts} = {} if (!$dbopts);
+
+  ##-- parse: cache size
+  if (defined($dbopts->{cachesize}) && $dbopts->{cachesize} =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
+    my ($size,$suff) = ($1,$2);
+    $suff = 'B' if (!defined($suff));
+    $size *= 1024    if ($suff eq 'K');
+    $size *= 1024**2 if ($suff eq 'M');
+    $size *= 1024**3 if ($suff eq 'G');
+    $size *= 1024**4 if ($suff eq 'T');
+    $dbopts->{cachesize} = $size;
+  }
+
+  return $dbopts;
+}
+
+
 ## $dbf = $dbf->open($file,%opts)
 ##  + %opts are as for new()
 ##  + $file defaults to $dbf->{file}
@@ -98,6 +119,7 @@ sub open {
   @$dbf{keys %opts} = values(%opts);
   $file = $dbf->{file} if (!defined($file));
   $dbf->{file} = $file;
+  $dbf->parseOptions();
   @{$dbf->{dbinfo}}{keys %{$dbf->{dbopts}}} = values %{$dbf->{dbopts}};
 
   ##-- truncate file here if user specified O_TRUNC, since DB_File doesn't

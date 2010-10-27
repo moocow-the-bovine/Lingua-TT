@@ -1,0 +1,11 @@
+%%-*- Mode: CSV; coding: utf-8 -*-
+Foo	@foo	ADJ
+foo	@foo	ADJ
+foos	@foo	ADJ
+Bar	@bar	ADJ
+Baz
+öde	@öde
+oede	@öde
+im	@im	@ihm
+ihm	@im	@ihm
+iem	@ihm	@iem

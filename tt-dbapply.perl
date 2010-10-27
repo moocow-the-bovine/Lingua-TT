@@ -4,6 +4,7 @@ use lib '.';
 use Lingua::TT;
 use Lingua::TT::DB::File;
 use Fcntl;
+use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -15,12 +16,13 @@ use File::Basename qw(basename);
 
 our $prog = basename($0);
 our $VERSION  = "0.01";
-our $encoding = undef;
-our $outfile  = '-';
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{});
-our $cachesize     = '128M';
+our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
+our $dbencoding = undef;
+
+our $ttencoding = undef;
+our $outfile  = '-';
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -34,12 +36,14 @@ GetOptions(##-- general
 	   ##-- db options
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'db-cachesize|db-cache|cache|c=s' => \$cachesize,
+	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-option|O=s' => $dbf{dbopts},
+	   'db-encoding|dbe=s' => \$dbencoding,
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
+	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
+	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -56,29 +60,20 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 
 ##-- open db
 my $dbfile = shift(@ARGV);
-if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
-  my ($size,$suff) = ($1,$2);
-  $suff = 'B' if (!defined($suff));
-  $size *= 1024    if ($suff eq 'K');
-  $size *= 1024**2 if ($suff eq 'M');
-  $size *= 1024**3 if ($suff eq 'G');
-  $size *= 1024**4 if ($suff eq 'T');
-  $dbf{dbopts}{cachesize} = $size;
-}
 our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$dbfile)
   or die("$prog: could not open or create DB file '$outfile': $!");
 our $data = $dbf->{data};
 #our $tied = $dbf->{tied};
 
 ##-- open output handle
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
+our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
   or die("$0: open failed for '$outfile': $!");
 our $outfh = $ttout->{fh};
 
 ##-- process inputs
 our ($text,$a_in,$a_dict);
 foreach $infile (@ARGV ? @ARGV : '-') {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
+  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$ttencoding)
     or die("$0: open failed for '$infile': $!");
   $infh = $ttin->{fh};
 
@@ -86,7 +81,12 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     next if (/^%%/ || /^$/);
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
-    $a_dict = $data->{$text};
+    if (defined($dbencoding)) {
+      $a_dict = $data->{encode($dbencoding,$text)};
+      $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
+    } else {
+      $a_dict = $data->{$text};
+    }
     $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
   }
   continue {

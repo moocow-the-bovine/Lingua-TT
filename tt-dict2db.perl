@@ -4,6 +4,7 @@ use lib '.';
 use Lingua::TT;
 use Lingua::TT::DB::File;
 use Fcntl;
+use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -15,12 +16,13 @@ use File::Basename qw(basename);
 
 our $prog = basename($0);
 our $VERSION  = "0.01";
-our $encoding = undef;
-our $outfile  = undef; ##-- default: INFILE.db
+
+our $iencoding = undef;
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR|O_CREAT, dbopts=>{});
-our $cachesize     = '128M';
+our %dbf           = (type=>'BTREE', flags=>O_RDWR|O_CREAT, dbopts=>{cachesize=>'128M'});
+our $dbencoding    = undef;
+our $outfile  = undef; ##-- default: INFILE.db
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -36,13 +38,15 @@ GetOptions(##-- general
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
 	   'append|add|a!' => \$append,
 	   'truncate|trunc|clobber|t!' => sub { $append=!$_[1]; },
-	   'db-cachesize|db-cache|cache|c=s' => \$cachesize,
+	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-option|O=s' => $dbf{dbopts},
 	   'include-empty-analyses|include-empty|empty!' => \$include_empty,
 
 	   ##-- I/O
+	   'input-encoding|iencoding|ie=s' => \$iencoding,
 	   'output-db|output|out|o|odb|db=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
+	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbencoding,
+	   'encoding|e=s' => sub {$iencoding=$dbencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -61,15 +65,6 @@ push(@ARGV,'-') if (!@ARGV);
 $outfile   = $ARGV[0].".db"  if (!defined($outfile));
 
 ##-- open db
-if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
-  my ($size,$suff) = ($1,$2);
-  $suff = 'B' if (!defined($suff));
-  $size *= 1024    if ($suff eq 'K');
-  $size *= 1024**2 if ($suff eq 'M');
-  $size *= 1024**3 if ($suff eq 'G');
-  $size *= 1024**4 if ($suff eq 'T');
-  $dbf{dbopts}{cachesize} = $size;
-}
 $dbf{flags} |=  O_TRUNC if (!$append);
 our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile)
   or die("$prog: could not open or create DB file '$outfile': $!");
@@ -78,7 +73,7 @@ our $tied = $dbf->{tied};
 
 ##-- process input files
 foreach $infile (@ARGV) {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
+  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$iencoding)
     or die("$0: open failed for '$infile': $!");
   $infh = $ttin->{fh};
 
@@ -87,6 +82,10 @@ foreach $infile (@ARGV) {
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
     next if (!defined($a_in) && !$include_empty); ##-- no entry for unanalyzed input
+    if (defined($dbencoding)) {
+      $text = encode($dbencoding,$text);
+      $a_in = encode($dbencoding,$a_in);
+    }
     $tied->put($text,$a_in)==0
       or die("$prog: DB_File::put() failed: $!");
   }

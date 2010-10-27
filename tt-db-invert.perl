@@ -2,7 +2,10 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Dict;
+use Lingua::TT::DB::File;
+use DB_File;
+use Fcntl;
+use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -12,9 +15,14 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
+our $prog = basename($0);
 our $VERSION  = "0.01";
-our $encoding = undef;
-our $outfile  = '-';
+
+our $include_empty = 0;
+our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
+our $dbencoding    = undef;
+
+our $outfile  = undef; ##-- default: $infile.inv
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -25,50 +33,66 @@ GetOptions(##-- general
 	   #'version|V' => \$version,
 	   #'verbose|v=i' => \$verbose,
 
+	   ##-- db options
+	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
+	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
+	   'db-option|O=s' => $dbf{dbopts},
+
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
+	   'encoding|db-encoding|dbe|e=s' => sub {$dbencoding=$_[1]}, ##-- IGNORED
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No input DB file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
+
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
-##-- i/o
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
-  or die("$0: open failed for '$outfile': $!");
-our $outfh = $ttout->{fh};
+##-- input db
+our $idbfile = shift(@ARGV);
+our $idbf = Lingua::TT::DB::File->new(%dbf,file=>$idbfile)
+  or die("$prog: could not open input DB file '$idbfile': $!");
+our $idata = $idbf->{data};
+our $itied = $idbf->{tied};
 
-##-- read type dict
-my $dictfile = shift(@ARGV);
-my $dict = Lingua::TT::Dict->loadFile($dictfile,encoding=>$encoding)
-  or die("$0: load failed for dict file '$dictfile': $!");
-my $dh = $dict->{dict};
+##-- output db
+our $odbfile = $outfile;
+$odbfile = "$idbfile.inv" if (!defined($odbfile));
+$dbf{flags} |= (O_CREAT|O_TRUNC);
+our $odbf = Lingua::TT::DB::File->new(%dbf,file=>$odbfile)
+  or die("$prog: could not open input or create output DB file '$odbfile': $!");
+our $odata = $odbf->{data};
 
-##-- process token files
-foreach $infile (@ARGV ? @ARGV : '-') {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
-    or die("$0: open failed for '$infile': $!");
-  $infh = $ttin->{fh};
-
-  while (defined($_=<$infh>)) {
-    next if (/^%%/ || /^$/);
-    chomp;
-    ($text,$a_in) = split(/\t/,$_,2);
-    $a_dict = $dh->{$text};
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
+##-- dump DB
+my ($key,$val,$status,$line);
+$key=$val=0;
+for ($status = $itied->seq($key,$val,R_FIRST);
+     $status == 0;
+     $status = $itied->seq($key,$val,R_NEXT))
+  {
+    @a_in = split(/\t/,$val);
+    foreach (@a_in) {
+      if (exists($odata->{$_})) {
+	$odata->{$_} .= "\t".$key;
+      } else {
+	$odata->{$_} = $key;
+      }
+    }
   }
-  continue {
-    $outfh->print($_);
-  }
-  $ttin->close;
-}
+
+
+undef($idata);
+undef($itied);
+undef($odata);
+$idbf->close;
+$odbf->close;
 
 
 __END__
@@ -81,20 +105,23 @@ __END__
 
 =head1 NAME
 
-tt-dictapply.perl - apply text-keyed dictionary analyses to TT file(s)
+tt-db-invert.perl - invert DB dict files
 
 =head1 SYNOPSIS
 
- tt-dictapply.perl [OPTIONS] DICT_FILE [TT_FILE(s)]
+ tt-db-invert.perl [OPTIONS] DB_FILE
 
  General Options:
    -help
-   #-version
-   #-verbose LEVEL
+
+ DB Options:
+  -hash   , -btree      ##-- select DB output type (default='BTREE')
+  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
+  -db-option OPT=VAL    ##-- set DB_File option
 
  I/O Options:
    -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- default: UTF-8
+   -encoding ENCODING   ##-- (ignored)
 
 =cut
 

@@ -10,13 +10,14 @@ use Lingua::TT::Token;
 use Lingua::TT::Sentence;
 use Lingua::TT::Document;
 use Lingua::TT::IO;
+use Lingua::TT::Dict;
 
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
 
-our $VERSION = 0.05;
+our $VERSION = 0.06;
 
 ##==============================================================================
 ## Constructors etc.

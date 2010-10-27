@@ -31,7 +31,7 @@ GetOptions(##-- general
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+#pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
@@ -41,15 +41,11 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 ##----------------------------------------------------------------------
 
 ##-- i/o
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
-  or die("$0: open failed for '$outfile': $!");
-our $outfh = $ttout->{fh};
+push(@ARGV,'-') if (!@ARGV);
 
-##-- read type dict
-my $dictfile = shift(@ARGV);
-my $dict = Lingua::TT::Dict->loadFile($dictfile,encoding=>$encoding)
-  or die("$0: load failed for dict file '$dictfile': $!");
-my $dh = $dict->{dict};
+##-- output dict
+my $dict = Lingua::TT::Dict->new();
+my $dh   = $dict->{dict};
 
 ##-- process token files
 foreach $infile (@ARGV ? @ARGV : '-') {
@@ -60,15 +56,20 @@ foreach $infile (@ARGV ? @ARGV : '-') {
   while (defined($_=<$infh>)) {
     next if (/^%%/ || /^$/);
     chomp;
-    ($text,$a_in) = split(/\t/,$_,2);
-    $a_dict = $dh->{$text};
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
-  }
-  continue {
-    $outfh->print($_);
+    ($text,@a_in) = split(/\t/,$_);
+
+    foreach (@a_in) {
+      $dh->{$_} .= "\t".$text;
+    }
   }
   $ttin->close;
 }
+
+##-- trim leading TABs
+$_=~s/^\t// foreach (values %$dh);
+
+##-- dump
+$dict->saveFile($outfile,encoding=>$encoding);
 
 
 __END__
@@ -81,11 +82,11 @@ __END__
 
 =head1 NAME
 
-tt-dictapply.perl - apply text-keyed dictionary analyses to TT file(s)
+tt-dict-invert.perl - invert TT dict files
 
 =head1 SYNOPSIS
 
- tt-dictapply.perl [OPTIONS] DICT_FILE [TT_FILE(s)]
+ tt-dict-invert.perl [OPTIONS] [DICT_FILE(s)]
 
  General Options:
    -help

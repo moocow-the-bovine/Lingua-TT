@@ -2,7 +2,10 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::Dict;
+use Lingua::TT::DB::File;
+use DB_File;
+use Fcntl;
+use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -12,8 +15,14 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
+our $prog = basename($0);
 our $VERSION  = "0.01";
-our $encoding = undef;
+
+our $include_empty = 0;
+our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
+our $dbencoding    = undef;
+
+our $oencoding = undef;
 our $outfile  = '-';
 
 ##----------------------------------------------------------------------
@@ -25,50 +34,59 @@ GetOptions(##-- general
 	   #'version|V' => \$version,
 	   #'verbose|v=i' => \$verbose,
 
+	   ##-- db options
+	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
+	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
+	   'db-option|O=s' => $dbf{dbopts},
+	   'db-encoding|dbe|de=s' => \$dbencoding,
+
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$encoding,
+	   'output-encoding|oencoding|oe=s' => \$oencoding,
+	   'encoding|e=s' => sub {$dbencoding=$oencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No DB file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
+
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
-##-- i/o
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
+
+##-- open db
+my $dbfile = shift(@ARGV);
+our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$dbfile)
+  or die("$prog: could not open or create DB file '$outfile': $!");
+our $data = $dbf->{data};
+our $tied = $dbf->{tied};
+
+##-- open output handle
+our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$oencoding)
   or die("$0: open failed for '$outfile': $!");
 our $outfh = $ttout->{fh};
 
-##-- read type dict
-my $dictfile = shift(@ARGV);
-my $dict = Lingua::TT::Dict->loadFile($dictfile,encoding=>$encoding)
-  or die("$0: load failed for dict file '$dictfile': $!");
-my $dh = $dict->{dict};
-
-##-- process token files
-foreach $infile (@ARGV ? @ARGV : '-') {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$encoding)
-    or die("$0: open failed for '$infile': $!");
-  $infh = $ttin->{fh};
-
-  while (defined($_=<$infh>)) {
-    next if (/^%%/ || /^$/);
-    chomp;
-    ($text,$a_in) = split(/\t/,$_,2);
-    $a_dict = $dh->{$text};
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
+##-- dump DB
+my ($key,$val,$status,$line);
+$key=$val=0;
+for ($status = $tied->seq($key,$val,R_FIRST);
+     $status == 0;
+     $status = $tied->seq($key,$val,R_NEXT))
+  {
+    $line = $key."\t".$val."\n";
+    $line = decode($dbencoding,$line) if (defined($dbencoding));
+    $outfh->print($line);
   }
-  continue {
-    $outfh->print($_);
-  }
-  $ttin->close;
-}
+
+undef($data);
+undef($tied);
+$dbf->close;
+$ttout->close;
 
 
 __END__
@@ -81,16 +99,20 @@ __END__
 
 =head1 NAME
 
-tt-dictapply.perl - apply text-keyed dictionary analyses to TT file(s)
+tt-db2dict.perl - convert DB dictionary to text
 
 =head1 SYNOPSIS
 
- tt-dictapply.perl [OPTIONS] DICT_FILE [TT_FILE(s)]
+ tt-db2dict.perl [OPTIONS] DB_FILE
 
  General Options:
    -help
-   #-version
-   #-verbose LEVEL
+
+ DB Options:
+  -hash   , -btree      ##-- select DB output type (default='BTREE')
+  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
+  -db-option OPT=VAL    ##-- set DB_File option
+  -db-encoding ENC      ##-- set DB internal encoding (default: none)
 
  I/O Options:
    -output FILE         ##-- default: STDOUT
