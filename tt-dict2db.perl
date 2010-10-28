@@ -20,8 +20,7 @@ our $VERSION  = "0.01";
 our $iencoding = undef;
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR|O_CREAT, dbopts=>{cachesize=>'128M'});
-our $dbencoding    = undef;
+our %dbf           = (type=>'BTREE', flags=>O_RDWR|O_CREAT, encoding=>undef, dbopts=>{cachesize=>'128M'});
 our $outfile  = undef; ##-- default: INFILE.db
 
 ##----------------------------------------------------------------------
@@ -45,8 +44,8 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'input-encoding|iencoding|ie=s' => \$iencoding,
 	   'output-db|output|out|o|odb|db=s' => \$outfile,
-	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbencoding,
-	   'encoding|e=s' => sub {$iencoding=$dbencoding=$_[1]},
+	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbf{encoding},
+	   'encoding|e=s' => sub {$iencoding=$dbf{encoding}=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -82,10 +81,10 @@ foreach $infile (@ARGV) {
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
     next if (!defined($a_in) && !$include_empty); ##-- no entry for unanalyzed input
-    if (defined($dbencoding)) {
-      $text = encode($dbencoding,$text);
-      $a_in = encode($dbencoding,$a_in);
-    }
+#    if (defined($dbencoding)) {
+#      $text = encode($dbencoding,$text);
+#      $a_in = encode($dbencoding,$a_in);
+#    }
     $tied->put($text,$a_in)==0
       or die("$prog: DB_File::put() failed: $!");
   }
@@ -121,10 +120,12 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
   -empty  , -noempty    ##-- do/don't create records for empty analyses
   -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
   -db-option OPT=VAL    ##-- set DB_File option
+  -db-encoding ENC      ##-- set DB internal encoding (default: null)
 
  I/O Options:
+   -input-encoding ENC  ##-- set input encoding (default: null)
+   -encoding ENC        ##-- alias for -input-encoding=ENC -db-encoding=ENC
    -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- default: UTF-8
 
 =cut
 

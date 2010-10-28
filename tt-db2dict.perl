@@ -19,8 +19,8 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
-our $dbencoding    = undef;
+our %dbf           = (type=>'GUESS', flags=>O_RDONLY, encoding=>undef, dbopts=>{cachesize=>'128M'});
+#our $dbencoding    = undef;
 
 our $oencoding = undef;
 our $outfile  = '-';
@@ -36,15 +36,16 @@ GetOptions(##-- general
 
 	   ##-- db options
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-btree|btree|dbb' => sub { $dbf{type}='BTREE'; },
+	   'db-guess|guess|dbg' => sub { $dbf{type}='GUESS'; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-option|O=s' => $dbf{dbopts},
-	   'db-encoding|dbe|de=s' => \$dbencoding,
+	   'db-encoding|dbe|de=s' => \$dbf{encoding},
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'output-encoding|oencoding|oe=s' => \$oencoding,
-	   'encoding|e=s' => sub {$dbencoding=$oencoding=$_[1]},
+	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -78,9 +79,11 @@ for ($status = $tied->seq($key,$val,R_FIRST);
      $status == 0;
      $status = $tied->seq($key,$val,R_NEXT))
   {
-    $line = $key."\t".$val."\n";
-    $line = decode($dbencoding,$line) if (defined($dbencoding));
-    $outfh->print($line);
+    #$line = $key."\t".$val."\n";
+    #$line = decode($dbencoding,$line) if (defined($dbencoding));
+    #$outfh->print($line);
+    ##--
+    $outfh->print($key,"\t",$val,"\n");
   }
 
 undef($data);
@@ -109,14 +112,15 @@ tt-db2dict.perl - convert DB dictionary to text
    -help
 
  DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
-  -db-option OPT=VAL    ##-- set DB_File option
-  -db-encoding ENC      ##-- set DB internal encoding (default: none)
+  -hash , -btree , -guess ##-- select DB output type (default='GUESS')
+  -cache SIZE             ##-- set DB cache size (with suffixes K,M,G)
+  -db-option OPT=VAL      ##-- set DB_File option
+  -db-encoding ENC        ##-- set DB internal encoding (default: null)
 
  I/O Options:
-   -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- default: UTF-8
+   -output FILE           ##-- default: STDOUT
+   -output-encoding ENC   ##-- output encoding (default: null)
+   -encoding ENC          ##-- alias for -db-encoding=ENC -output-encoding=ENC
 
 =cut
 

@@ -5,7 +5,6 @@ use Lingua::TT;
 use Lingua::TT::DB::File;
 use DB_File;
 use Fcntl;
-use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -19,8 +18,7 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
-our $dbencoding    = undef;
+our %dbf           = (type=>'GUESS', flags=>O_RDWR, encoding=>undef, dbopts=>{cachesize=>'128M'});
 
 our $outfile  = undef; ##-- default: $infile.inv
 
@@ -35,13 +33,14 @@ GetOptions(##-- general
 
 	   ##-- db options
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-btree|btree|dbb' => sub { $dbf{type}='BTREE'; },
+	   'db-guess|guess|dbg' => sub { $dbf{type}='GUESS'; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-option|O=s' => $dbf{dbopts},
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'encoding|db-encoding|dbe|e=s' => sub {$dbencoding=$_[1]}, ##-- IGNORED
+	   'encoding|db-encoding|dbe|e=s' => \$dbf{encoding},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -121,7 +120,7 @@ tt-db-invert.perl - invert DB dict files
 
  I/O Options:
    -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- (ignored)
+   -encoding ENCODING   ##-- DB encoding (default: raw)
 
 =cut
 
