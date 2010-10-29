@@ -24,8 +24,8 @@ our $encoding     = undef;
 
 our $globargs = 1; ##-- glob @ARGV?
 our $listargs = 0; ##-- args are file-lists?
-our $eos       = '';
-our $k = 2;
+our $eos      = '__$';
+our $k        = 3;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -80,6 +80,7 @@ sub processTTFile {
     chomp;
     next if (/^\s*%%/);
     if ($_ eq '') {
+      next if (!defined($eos));
       foreach $j (1..$k) {
 	$kg[$i0] = $eos;
 	$outfh->print(join("\t", @kg[map {($i0+$_) % $k} (1..$k)], 1), "\n");
@@ -92,7 +93,7 @@ sub processTTFile {
     }
   }
 
-  if ($kg[($i0-1) % $k] ne $eos) {
+  if (defined($eos) && $kg[($i0-1) % $k] ne $eos) {
     foreach $j (1..$k) {
       $kg[$i0] = $eos;
       $outfh->print(join("\t", @kg[map {($i0+$_) % $k} (1..$k)], 1), "\n");
@@ -143,11 +144,11 @@ __END__
 
 =head1 NAME
 
-tt-1grams.perl - get unigrams from TT file(s)
+tt-kgrams.perl - get k-grams from TT file(s)
 
 =head1 SYNOPSIS
 
- tt-1grams.perl [OPTIONS] [TTFILE(s)]
+ tt-kgrams.perl [OPTIONS] [TTFILE(s)]
 
  General Options:
    -help
@@ -155,18 +156,13 @@ tt-1grams.perl - get unigrams from TT file(s)
    -verbose LEVEL
 
  Other Options:
-   -union, -nounion     ##-- TTFILE argument(s) are/aren't really unigram files (default=no)
    -list , -nolist      ##-- TTFILE argument(s) are/aren't file-lists (default=no)
    -glob , -noglob      ##-- do/don't glob TTFILE argument(s) (default=do)
-   -cmts , -nocmts      ##-- do/don't count comments (default=don't)
-   -init 1GFILE         ##-- initialize unigrams from 1GFILE (default=none)
-   -eos EOS             ##-- count eos as string EOS (default='')
+   -eos EOS             ##-- count eos as string EOS (default='__$')
    -noeos               ##-- do/don't count EOS at all
-   -freqsort            ##-- sort output by frequency (default)
-   -lexsort             ##-- sort output lexically
-   -nosort              ##-- don't sort output at all
    -encoding ENC        ##-- input encoding (default=raw)
    -output FILE         ##-- output file (default=STDOUT)
+   -k K                 ##-- k-gram window length
 
 =cut
 
