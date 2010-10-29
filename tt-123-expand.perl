@@ -108,7 +108,7 @@ foreach $infile (@in1) {
       if (!$prf[$pi] || $prf[$pi][0] ne $key[$pi]) {
 	##-- prefix mismatch: dump remaining buffered prefix data
 	foreach $pj (reverse $pi..$#prf) {
-	  $prf[0][1]++ if ($moot_eos_hack && $pi==0 && $pj==0 && $prf[0][0] eq '__$');
+	  $prf[0][1]=$prf[0][1]*2+1 if ($moot_eos_hack && $pi==0 && $pj==0 && $prf[0][0] eq '__$');
 	  print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
 	}
 	splice(@prf,$pi,@prf-$pi,map {[$_,$f]} @key[$pi..$#key]);
@@ -122,7 +122,7 @@ foreach $infile (@in1) {
   }
   ##-- end of file: dump any remaining prefixes
   foreach $pj (reverse 0..$#prf) {
-    $prf[0][1]++ if ($moot_eos_hack && $pj==0 && $prf[0][0] eq '__$');
+    $prf[0][1]=$prf[0][1]*2+1 if ($moot_eos_hack && $pj==0 && $prf[0][0] eq '__$');
     print join("\t", (map {$_->[0]} @prf[0..$pj]), $prf[$pj][1]), "\n";
   }
 
@@ -152,7 +152,7 @@ tt-123-expand.perl - expand all (k<=n)-grams in verbose n-gram files
    -sort  , -nosort   ##-- do/don't sort all inputs (default=don't)
    -merge , -nomerge  ##-- do/don't merge sorted inputs (default=do)
    -keep  , -nokeep   ##-- do/don't keep temporary files (default=don't)
-   -moot-eos-hack     ##-- for moot, set f(__$) := sum(f(* __$))+1 [default]
+   -moot-eos-hack     ##-- for moot, set f(__$) := 2*sum(f(* __$))+1 [default]
    -no-eos-hack       ##-- disable moot eos hack
    -output OUTFILE    ##-- set output file (default=STDOUT)
 
