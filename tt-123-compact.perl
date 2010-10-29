@@ -128,11 +128,13 @@ foreach $infile (@in1) {
 
 =head1 NAME
 
-tt-123-uncompact.perl - un-compact prefix-encoded (k<=n)-grams in moot .123 files
+tt-123-compact.perl - compact verbose (k<=n)-grams in moot .123 files by prefix-encoding [BROKEN!]
 
 =head1 SYNOPSIS
 
  tt-123-uncompact.perl [OPTIONS] 123_FILE(s)...
+
+ !!! BROKEN !!!
 
  General Options:
    -help

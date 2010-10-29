@@ -31,6 +31,10 @@ our $FS_SUFFIX = '.tmp';
 our $FS_PREFIX = 'fs';
 our $FS_VERBOSE = 0;
 
+BEGIN {
+  $ENV{LC_ALL}="C";
+}
+
 ##==============================================================================
 ## OO interface
 
