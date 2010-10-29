@@ -22,6 +22,8 @@ our %dbf           = (type=>'GUESS', flags=>O_RDWR, encoding=>undef, dbopts=>{ca
 
 our $outfile  = undef; ##-- default: $infile.inv
 
+our $weights = 0; ##-- keep weights in value part of dict?
+
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
@@ -37,6 +39,9 @@ GetOptions(##-- general
 	   'db-guess|guess|dbg' => sub { $dbf{type}='GUESS'; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-option|O=s' => $dbf{dbopts},
+
+	   ##-- misc
+	   'weights|weight|w!' => \$weights, ##-- if true, weights will be parsed and appended to dict values
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -78,10 +83,11 @@ for ($status = $itied->seq($key,$val,R_FIRST);
   {
     @a_in = split(/\t/,$val);
     foreach (@a_in) {
+      $keyw = $key.($weights && s/(\s*\<[\+\-\d\.eE]+\>\s*)$// ? $1 : '');
       if (exists($odata->{$_})) {
-	$odata->{$_} .= "\t".$key;
+	$odata->{$_} .= "\t".$keyw;
       } else {
-	$odata->{$_} = $key;
+	$odata->{$_} = $keyw;
       }
     }
   }
@@ -119,6 +125,7 @@ tt-db-invert.perl - invert DB dict files
   -db-option OPT=VAL    ##-- set DB_File option
 
  I/O Options:
+   -weight , -noweight  ##-- do/don't keep FST-style weight suffixes in value part (default=don't)
    -output FILE         ##-- default: STDOUT
    -encoding ENCODING   ##-- DB encoding (default: raw)
 

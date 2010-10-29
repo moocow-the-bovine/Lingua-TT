@@ -16,6 +16,8 @@ our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = '-';
 
+our $weights = 0; ##-- keep weights in value part of dict?
+
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
@@ -24,6 +26,9 @@ GetOptions(##-- general
 	   #'man|m'  => \$man,
 	   #'version|V' => \$version,
 	   #'verbose|v=i' => \$verbose,
+
+	   ##-- misc
+	   'weights|weight|w!' => \$weights, ##-- if true, weights will be parsed and appended to dict values
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -59,7 +64,8 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     ($text,@a_in) = split(/\t/,$_);
 
     foreach (@a_in) {
-      $dh->{$_} .= "\t".$text;
+      $w = $weights && s/(\s*\<[\+\-\d\.eE]+\>\s*)$// ? $1 : undef;
+      $dh->{$_} .= "\t".$text.(defined($w) ? $w : '');
     }
   }
   $ttin->close;
@@ -94,6 +100,7 @@ tt-dict-invert.perl - invert TT dict files
    #-verbose LEVEL
 
  I/O Options:
+   -weight , -noweight  ##-- do/don't keep FST-style weight suffixes in value part (default=don't)
    -output FILE         ##-- default: STDOUT
    -encoding ENCODING   ##-- default: UTF-8
 
