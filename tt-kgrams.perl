@@ -24,6 +24,7 @@ our $encoding     = undef;
 
 our $globargs = 1; ##-- glob @ARGV?
 our $listargs = 0; ##-- args are file-lists?
+#our $eos      = '__$(%d)';
 our $eos      = '__$';
 our $k        = 3;
 
@@ -66,13 +67,15 @@ sub vmsg {
 ##----------------------------------------------------------------------
 ## subs: guts
 
+our @eos = (map {sprintf($eos,$_)} (1..$k));
+
 sub processTTFile {
   my ($ttfile,$outfh) = @_;
   my $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>$encoding)
     or die("$0: open failed for input file '$ttfile': $!");
   my $infh = $ttin->{fh};
 
-  my @kg = (map {$eos} (1..$k));
+  my @kg = @eos;
   my $i0 = 0;
   my ($j);
 
@@ -82,7 +85,7 @@ sub processTTFile {
     if ($_ eq '') {
       next if (!defined($eos));
       foreach $j (1..$k) {
-	$kg[$i0] = $eos;
+	$kg[$i0] = $eos[$j-1];
 	$outfh->print(join("\t", @kg[map {($i0+$_) % $k} (1..$k)], 1), "\n");
 	$i0 = ($i0+1) % $k;
       }
@@ -93,9 +96,9 @@ sub processTTFile {
     }
   }
 
-  if (defined($eos) && $kg[($i0-1) % $k] ne $eos) {
+  if (defined($eos) && $kg[($i0-1) % $k] ne $eos[$#eos]) {
     foreach $j (1..$k) {
-      $kg[$i0] = $eos;
+      $kg[$i0] = $eos[$j-1];
       $outfh->print(join("\t", @kg[map {($i0+$_) % $k} (1..$k)], 1), "\n");
       $i0 = ($i0+1) % $k;
     }
