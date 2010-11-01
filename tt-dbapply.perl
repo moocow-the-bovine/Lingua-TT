@@ -23,6 +23,7 @@ our $dbencoding = undef;
 
 our $ttencoding = undef;
 our $outfile  = '-';
+our $include_empty = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -41,6 +42,7 @@ GetOptions(##-- general
 	   'db-encoding|dbe=s' => \$dbencoding,
 
 	   ##-- I/O
+	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	   'output|o=s' => \$outfile,
 	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
 	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
@@ -87,7 +89,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     } else {
       $a_dict = $data->{$text};
     }
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
+    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
   }
   continue {
     $outfh->print($_);
