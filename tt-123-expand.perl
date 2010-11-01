@@ -23,7 +23,7 @@ our $outfile      = '-';
 our $verbose      = 0;
 our $sort         = 0; ##-- sort input file(s)?
 our $merge        = 1; ##-- merge multiple sorted input file(s)?
-our $moot_eos_hack = 0; ##-- moot-compatible eos hack? (basically ignores eos for later handling by e.g. tt-123-tt2moot.perl)
+our $moot_eos_hack = 0; ##-- moot-compatible eos hack? --------------- BROKEN ------------------
 
 ##----------------------------------------------------------------------
 ## Command-line processing
