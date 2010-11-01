@@ -23,7 +23,6 @@ our $dbencoding = undef;
 
 our $ttencoding = undef;
 our $outfile  = '-';
-our $include_empty = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
