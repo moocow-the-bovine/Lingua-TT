@@ -125,8 +125,9 @@ tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
   -db-option OPT=VAL    ##-- set DB_File option
 
  I/O Options:
-   -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- default: UTF-8
+  -output FILE          ##-- default: STDOUT
+  -encoding ENCODING    ##-- default: UTF-8
+  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
 
 =cut
 
