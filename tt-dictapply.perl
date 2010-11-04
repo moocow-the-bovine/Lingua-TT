@@ -15,19 +15,18 @@ use File::Basename qw(basename);
 our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = '-';
+our $include_empty = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
 GetOptions(##-- general
 	   'help|h' => \$help,
-	   #'man|m'  => \$man,
-	   #'version|V' => \$version,
-	   #'verbose|v=i' => \$verbose,
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
+	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -62,7 +61,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
     $a_dict = $dh->{$text};
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) ? $a_dict : qw()))."\n";
+    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
   }
   continue {
     $outfh->print($_);
@@ -89,12 +88,11 @@ tt-dictapply.perl - apply text-keyed dictionary analyses to TT file(s)
 
  General Options:
    -help
-   #-version
-   #-verbose LEVEL
 
  I/O Options:
-   -output FILE         ##-- default: STDOUT
-   -encoding ENCODING   ##-- default: UTF-8
+  -output FILE         ##-- default: STDOUT
+  -encoding ENCODING   ##-- default: UTF-8
+  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
 
 =cut
 
