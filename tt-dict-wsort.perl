@@ -17,6 +17,7 @@ our $encoding = undef;
 our $outfile  = '-';
 
 our $cmp = 'asc';
+our $keep_zero_weights=1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -30,6 +31,7 @@ GetOptions(##-- general
 	   ##-- misc
 	   'ascending|asc|a' => sub {$cmp='asc';},
 	   'descending|desc|dsc|d' => sub {$cmp='dsc';},
+	   'keep-zero|zero!' => \$keep_zero_weights,
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -72,7 +74,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     chomp;
     ($key,@a0) = split(/\t/,$_);
     $outfh->print(join("\t", $key,
-		       map {"$_->[0]".($_->[1]==0 ? '' : "<$_->[1]>")}
+		       map {"$_->[0]".(!$keep_zero_weights && $_->[1]==0 ? '' : "<$_->[1]>")}
 		       sort acmp
 		       map {/^(.*)\<([\+\-\d\.eE]+)\>$/ ? [$1,$2] : [$_,0]} @a0),
 		  "\n");
@@ -106,7 +108,8 @@ tt-dict-wsort.perl - sort values in tt dict files by fst-style weight
    #-verbose LEVEL
 
  I/O Options:
-   -asc , -desc         ##-- sort in ascending/descending order (default=-asc)
+   -asc  , -desc        ##-- sort in ascending/descending order (default=-asc)
+   -zero , -nozero      ##-- do/don't keep zero weights explicitly in output (default=do)
    -output FILE         ##-- default: STDOUT
    -encoding ENCODING   ##-- default: UTF-8
 
