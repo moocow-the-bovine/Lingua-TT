@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DB::File;
+use Lingua::TT::DBFile;
 use DB_File;
 use Fcntl;
 
@@ -61,7 +61,7 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No input DB file specified!'}) if (!@A
 
 ##-- input db
 our $idbfile = shift(@ARGV);
-our $idbf = Lingua::TT::DB::File->new(%dbf,file=>$idbfile)
+our $idbf = Lingua::TT::DBFile->new(%dbf,file=>$idbfile)
   or die("$prog: could not open input DB file '$idbfile': $!");
 our $idata = $idbf->{data};
 our $itied = $idbf->{tied};
@@ -70,7 +70,7 @@ our $itied = $idbf->{tied};
 our $odbfile = $outfile;
 $odbfile = "$idbfile.inv" if (!defined($odbfile));
 $dbf{flags} |= (O_CREAT|O_TRUNC);
-our $odbf = Lingua::TT::DB::File->new(%dbf,file=>$odbfile)
+our $odbf = Lingua::TT::DBFile->new(%dbf,file=>$odbfile)
   or die("$prog: could not open input or create output DB file '$odbfile': $!");
 our $odata = $odbf->{data};
 

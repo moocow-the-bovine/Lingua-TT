@@ -1,10 +1,10 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::DB::File.pm
+## File: Lingua::TT::DBFile.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
 ## Descript: TT I/O: Berkely DB: tied Files
 
 
-package Lingua::TT::DB::File;
+package Lingua::TT::DBFile;
 use Lingua::TT::Persistent;
 use DB_File;
 use Fcntl;

@@ -1,12 +1,12 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::DB::Enum.pm
+## File: Lingua::TT::DBx::Enum.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
 ## Descript: TT I/O: Berkely DB: enums
 
 
-package Lingua::TT::DB::Enum;
-use Lingua::TT::DB::File;
-#use Lingua::TT::DB::File::Array;
+package Lingua::TT::DBx::Enum;
+use Lingua::TT::DBFile;
+#use Lingua::TT::DBFile::Array;
 use DB_File;
 use Fcntl;
 use Carp;
@@ -24,12 +24,12 @@ our @ISA = qw();
 ## + %opts, %$doc:
 ##   ##-- user options
 ##   file     => $basename,    ##-- file basename; default=undef (none)
-##   opts_s2i => \%opts,       ##-- Lingua::TT::DB::File options for 's2i' file
-##   opts_i2s => \%opts,       ##-- Lingua::TT::DB::File options for 'i2s' file
+##   opts_s2i => \%opts,       ##-- Lingua::TT::DBFile options for 's2i' file
+##   opts_i2s => \%opts,       ##-- Lingua::TT::DBFile options for 'i2s' file
 ##   ##
 ##   ##-- low-level data
-##   s2i => $s2i,              ##-- Lingua::TT::DB::File object for 'sym2id'
-##   i2s => $i2s,              ##-- Lingua::TT::DB::File object for 'id2sym'
+##   s2i => $s2i,              ##-- Lingua::TT::DBFile object for 'sym2id'
+##   i2s => $i2s,              ##-- Lingua::TT::DBFile object for 'id2sym'
 ##   sym2id => \%sym2id,       ##-- ref to tied data: $sym => $id
 ##   id2sym => \@id2sym,       ##-- ref to tied data: $id  => $sym
 ##   size => $n_ids,           ##-- number of allocated ids (== index of first free id)
@@ -85,8 +85,8 @@ sub open {
   $dbe->{file} = $file;
   @$dbe{keys %opts} = values(%opts);
 
-  $dbe->{s2i} = Lingua::TT::DB::File->new(%{$dbe->{opts_s2i}}, file=>undef);
-  $dbe->{i2s} = Lingua::TT::DB::File->new(%{$dbe->{opts_i2s}}, file=>undef);
+  $dbe->{s2i} = Lingua::TT::DBFile->new(%{$dbe->{opts_s2i}}, file=>undef);
+  $dbe->{i2s} = Lingua::TT::DBFile->new(%{$dbe->{opts_i2s}}, file=>undef);
 
   $dbe->{s2i}->open("${file}_s2i.db")
     or confess(ref($dbe)."::open() failed for '${file}_s2i.db': $!");

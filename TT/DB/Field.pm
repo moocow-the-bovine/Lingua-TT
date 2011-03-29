@@ -1,10 +1,10 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::DB::Field.pm
+## File: Lingua::TT::DBx::Field.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
 ## Descript: TT I/O: Berkely DB: enumerated fields
 
-package Lingua::TT::DB::Field;
-use Lingua::TT::DB::File;
+package Lingua::TT::DBx::Field;
+use Lingua::TT::DBFile;
 use Lingua::TT::Enum;
 use Lingua::TT::Persistent;
 use DB_File;
@@ -39,7 +39,7 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##   file   => $file,      ##-- basename of field data files (default=undef --> from 'name')
 ##   flags  => $O_XYZ,     ##-- flags mask for dbf
 ##   enum   => $enum,      ##-- Lingua::TT::Enum: "${file}.enum"
-##   dbf    => $dbfile,    ##-- Lingua::TT::DB::File::PackedArray: "${file}.db"
+##   dbf    => $dbfile,    ##-- Lingua::TT::DBFile::PackedArray: "${file}.db"
 ##   data   => $thingy,    ##-- = $doc->{dbf}{data}
 sub new {
   my $that = shift;
@@ -131,7 +131,7 @@ sub open {
   my $file = $f->{file} = $f->filename();
 
   $f->{enum} = Lingua::TT::Enum->new();
-  $f->{dbf}  = Lingua::TT::DB::File::PackedArray->new(packfmt=>$f->{packfmt});
+  $f->{dbf}  = Lingua::TT::DBFile::PackedArray->new(packfmt=>$f->{packfmt});
 
   ##-- truncate enum?
   if (defined($f->{flags}) && ($f->{flags}&O_TRUNC)) {

@@ -2,7 +2,7 @@
 
 BEGIN	{
     if (ARGC < 1) {
-	print "Usage: tt-123-eos-expand.awk TT_FILE(s)..." > "/dev/stderr"
+	print "Usage: tt-123-eos-compress.awk TT_FILE(s)..." > "/dev/stderr"
 	print " + removes '__$' bigrams from expanded mootrain verbose .123 files" > "/dev/stderr"
 	exit 1;
     }

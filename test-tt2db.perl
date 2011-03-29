@@ -3,8 +3,8 @@
 use lib qw(.);
 use Lingua::TT;
 use Lingua::TT::Enum;
-use Lingua::TT::DB::File;
-use Lingua::TT::DB::File::PackedArray;
+use Lingua::TT::DBFile;
+use Lingua::TT::DBFile::PackedArray;
 use Fcntl;
 
 if (!@ARGV) {
@@ -16,7 +16,7 @@ $dbbase = $ttfile if (!defined($dbbase));
 
 my $io   = Lingua::TT::IO->fromFile($ttfile,encoding=>'UTF-8');
 my $enum = Lingua::TT::Enum->new();
-my $dbf = Lingua::TT::DB::File::PackedArray->new(packfmt=>'L',file=>"$dbbase.db",flags=>O_RDWR|O_CREAT|O_TRUNC)
+my $dbf = Lingua::TT::DBFile::PackedArray->new(packfmt=>'L',file=>"$dbbase.db",flags=>O_RDWR|O_CREAT|O_TRUNC)
   or die("$0: could not create db file $dbbase.db: $!");
 my $packfmt = $dbf->{packfmt};
 

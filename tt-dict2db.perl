@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DB::File;
+use Lingua::TT::DBFile;
 use Fcntl;
 use Encode qw(encode decode);
 
@@ -65,7 +65,7 @@ $outfile   = $ARGV[0].".db"  if (!defined($outfile));
 
 ##-- open db
 $dbf{flags} |=  O_TRUNC if (!$append);
-our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile)
+our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$outfile)
   or die("$prog: could not open or create DB file '$outfile': $!");
 our $data = $dbf->{data};
 our $tied = $dbf->{tied};

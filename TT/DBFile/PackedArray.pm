@@ -1,11 +1,11 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::DB::File::PackedArray.pm
+## File: Lingua::TT::DBFile::PackedArray.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
 ## Descript: TT I/O: Berkely DB: tied files: arrays (using DB_RECNO)
 
 
-package Lingua::TT::DB::File::PackedArray;
-use Lingua::TT::DB::File;
+package Lingua::TT::DBFile::PackedArray;
+use Lingua::TT::DBFile;
 use DB_File;
 use Carp;
 use strict;
@@ -13,7 +13,7 @@ use strict;
 ##==============================================================================
 ## Globals & Constants
 
-our @ISA = qw(Lingua::TT::DB::File);
+our @ISA = qw(Lingua::TT::DBFile);
 
 ##==============================================================================
 ## Constructors etc.

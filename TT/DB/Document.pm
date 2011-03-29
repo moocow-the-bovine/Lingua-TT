@@ -1,17 +1,17 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::DB::Document.pm
+## File: Lingua::TT::DBx::Document.pm
 ## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
 ## Descript: TT I/O: Document via Berkely DB
 
 
-package Lingua::TT::DB::Document;
+package Lingua::TT::DBx::Document;
 use Lingua::TT::Document;
-use Lingua::TT::DB::Field;
-use Lingua::TT::DB::File;
-use Lingua::TT::DB::File::Hash;
-use Lingua::TT::DB::File::BTree;
-use Lingua::TT::DB::File::Array;
-use Lingua::TT::DB::File::PackedArray;
+use Lingua::TT::DBx::Field;
+use Lingua::TT::DBFile;
+use Lingua::TT::DBFile::Hash;
+use Lingua::TT::DBFile::BTree;
+use Lingua::TT::DBFile::Array;
+use Lingua::TT::DBFile::PackedArray;
 use File::Path qw(mkpath);
 use File::Basename qw(basename dirname);
 use DB_File;
@@ -89,18 +89,18 @@ sub fields {
   my ($fspec,$f);
   my $fields = $dbdoc->{fields} = [];
   foreach $fspec (@fields) {
-    if (UNIVERSAL::isa($fspec,'Lingua::TT::DB::Field')) {
+    if (UNIVERSAL::isa($fspec,'Lingua::TT::DBx::Field')) {
       $fspec = $fspec->new() if (!ref($fspec));
       push(@$fields,$fspec);
-    } elsif (UNIVERSAL::isa(('Lingua::TT::DB::Field::'.lc($fspec)),'Lingua::TT::DB::Field')) {
-      push(@$fields,('Lingua::TT::DB::Field::'.lc($fspec))->new);
+    } elsif (UNIVERSAL::isa(('Lingua::TT::DBx::Field::'.lc($fspec)),'Lingua::TT::DBx::Field')) {
+      push(@$fields,('Lingua::TT::DBx::Field::'.lc($fspec))->new);
     } elsif (!ref($fspec)) {
       my ($name,$packfmt) = $fspec =~ /^.*\:.$/ ? ($1,$2) : ($fspec,'L');
-      push(@$fields, Lingua::TT::DB::Field->new(name=>$name,packfmt=>$packfmt));
+      push(@$fields, Lingua::TT::DBx::Field->new(name=>$name,packfmt=>$packfmt));
     } elsif (UNIVERSAL::isa($fspec,'HASH')) {
-      push(@$fields,Lingua::TT::DB::Field->new(%$fspec));
+      push(@$fields,Lingua::TT::DBx::Field->new(%$fspec));
     } elsif (UNIVERSAL::isa($fspec,'ARRAY')) {
-      push(@$fields,Lingua::TT::DB::Field->new(@$fspec));
+      push(@$fields,Lingua::TT::DBx::Field->new(@$fspec));
     } elsif (UNIVERSAL::isa($fspec,'CODE')) {
       push(@$fields,$fspec->($dbdoc));
     } else {
@@ -182,15 +182,15 @@ sub open {
   ##  + docs:   ARRAY: $file_i => join("\t", $doc_offset_nsents, $doc_filename)."\n"
   ##  + sents:  ARRAY: $sent_i =>  pack('L', $sent_offset_ntoks)
   ##  + cmts:   BTREE: $tok_i  => join("\n", @comment_lines_before_tok_i)
-  $dbdoc->{docs} = Lingua::TT::DB::File::Array->new(file=>"$dir/docs.db",
+  $dbdoc->{docs} = Lingua::TT::DBFile::Array->new(file=>"$dir/docs.db",
 						    flags=>$dbdoc->{flags}
 						   )
     or confess(ref($dbdoc)."::open(): open failed for '$dir/docs.db': $!");
-  $dbdoc->{sents} = Lingua::TT::DB::File::PackedArray->new(file=>"$dir/sents.db",
+  $dbdoc->{sents} = Lingua::TT::DBFile::PackedArray->new(file=>"$dir/sents.db",
 							   flags=>$dbdoc->{flags},
 							   packfmt=>'L')
     or confess(ref($dbdoc)."::open(): open failed for '$dir/sents.db': $!");
-  $dbdoc->{cmts} = Lingua::TT::DB::File::BTree->new(file=>"$dir/cmts.db",
+  $dbdoc->{cmts} = Lingua::TT::DBFile::BTree->new(file=>"$dir/cmts.db",
 						    flags=>$dbdoc->{flags},
 						    dbopts=>{compare=>sub { $_[0] <=> $_[1] }},
 						   )

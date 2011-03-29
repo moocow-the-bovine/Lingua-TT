@@ -285,11 +285,11 @@ sub test_enum {
 #test_enum();
 
 ##----------------------------------------------------------------------
-use Lingua::TT::DB::File::PackedArray;
+use Lingua::TT::DBFile::PackedArray;
 sub test_packedarray {
   my $af = @_ ? shift : 'pa.db';
 
-  my $pa = Lingua::TT::DB::File::PackedArray->new(packfmt=>'L',file=>$af,flags=>O_RDWR|O_CREAT|O_TRUNC);
+  my $pa = Lingua::TT::DBFile::PackedArray->new(packfmt=>'L',file=>$af,flags=>O_RDWR|O_CREAT|O_TRUNC);
   my @vals = map {[$_]} qw(1 2 3 42);
   $pa->ppush(@$_) foreach (@vals);
   $pa->close;

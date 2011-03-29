@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DB::File;
+use Lingua::TT::DBFile;
 use Fcntl;
 use Encode qw(encode decode);
 
@@ -61,7 +61,7 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 
 ##-- open db
 my $dbfile = shift(@ARGV);
-our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$dbfile)
+our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
   or die("$prog: could not open or create DB file '$outfile': $!");
 our $data = $dbf->{data};
 #our $tied = $dbf->{tied};

@@ -7,7 +7,7 @@ use File::Basename qw(basename dirname);
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DB::File;
+use Lingua::TT::DBFile;
 use Lingua::TT::Enum;
 use Fcntl;
 
@@ -94,7 +94,7 @@ if (defined($cachesize) && $cachesize =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/)
   $dbf{dbopts}{cachesize} = $size;
 }
 $dbf{flags} |=  O_TRUNC if (!$append);
-our $dbf = Lingua::TT::DB::File->new(%dbf,file=>$outfile_db)
+our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$outfile_db)
   or die("$prog: could not open or create DB file '$outfile_db': $!");
 our $data = $dbf->{data};
 
