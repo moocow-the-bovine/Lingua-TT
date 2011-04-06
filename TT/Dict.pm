@@ -55,6 +55,29 @@ sub get {
 }
 
 ##==============================================================================
+## Methods: merge
+
+## $dict = $dict->merge($dict2, %opts)
+##  + include $dict2 entries in $dict, destructively alters $dict
+##  + %opts:
+##     append => $bool,  ##-- if true, $dict2 values are appended to $dict1 values
+sub merge {
+  my ($d1,$d2,%opts) = @_;
+  if (!$opts{append}) {
+    @{$d1->{dict}}{CORE::keys %{$d2->{dict}}} = CORE::values %{$d2->{dict}}; ##-- clobber
+  } else {
+    my $h1 = $d1->{dict};
+    my $h2 = $d2->{dict};
+    my ($key,$val);
+    while (($key,$val)=each %$h2) {
+      $h1->{$key} = exists($h1->{$key}) ? "$h1->{$key}\t$val" : $val;
+    }
+  }
+  return $d1;
+}
+
+
+##==============================================================================
 ## Methods: I/O
 
 ##--------------------------------------------------------------
