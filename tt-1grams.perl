@@ -26,7 +26,7 @@ our $enum_ids     = 0;
 
 our $globargs = 1; ##-- glob @ARGV?
 our $listargs = 0; ##-- args are file-lists?
-our $want_cmts = 1;
+our $want_cmts = 0;
 our $eos       = '';
 our $sort      = 'freq'; ##-- one of qw(freq lex none)
 our $union     = 0;      ##-- union mode?
