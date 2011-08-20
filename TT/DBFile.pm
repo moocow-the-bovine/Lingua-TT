@@ -126,22 +126,34 @@ sub close {
   return $dbf;
 }
 
-## \%opts = $dbf->parseOptions(\%opts=$dbf->{dbopts})
-sub parseOptions {
-  my ($dbf,$dbopts) = @_;
-  $dbopts = $dbf->{dbopts} if (!$dbopts);
-  $dbopts = $dbf->{dbopts} = {} if (!$dbopts);
-
-  ##-- parse: cache size
-  if (defined($dbopts->{cachesize}) && $dbopts->{cachesize} =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
+## $sizeInt = parseSize($sizeString)
+sub parseSize {
+  my ($dbf,$str) = @_;
+  if (defined($str) && $str =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
     my ($size,$suff) = ($1,$2);
     $suff = 'B' if (!defined($suff));
     $size *= 1024    if ($suff eq 'K');
     $size *= 1024**2 if ($suff eq 'M');
     $size *= 1024**3 if ($suff eq 'G');
     $size *= 1024**4 if ($suff eq 'T');
-    $dbopts->{cachesize} = $size;
+    return $size;
   }
+  return $str;
+}
+
+## \%opts = $dbf->parseOptions(\%opts=$dbf->{dbopts})
+sub parseOptions {
+  my ($dbf,$dbopts) = @_;
+  $dbopts = $dbf->{dbopts} if (!$dbopts);
+  $dbopts = $dbf->{dbopts} = {} if (!$dbopts);
+
+  ##-- parse: size arguments
+  foreach (qw(cachesize psize)) {
+    $dbopts->{$_} = $dbf->parseSize($dbopts->{$_}) if (defined($dbopts->{$_}));
+  }
+
+  ##-- delete undef arguments
+  delete @$dbopts{grep {!defined($dbopts->{$_})} keys %$dbopts};
 
   return $dbopts;
 }
@@ -159,7 +171,7 @@ sub open {
   $dbf->parseOptions();
 
   ##-- truncate file here if user specified O_TRUNC, since DB_File doesn't
-  if (($dbf->{flags} & O_TRUNC) && -e $dbf->{file}) {
+  if (($dbf->{flags} & O_TRUNC) && defined($dbf->{file}) && -e $dbf->{file}) {
     $dbf->truncate()
       or confess(ref($dbf)."::open(O_TRUNC): could not unlink file '$dbf->{file}': $!");
   }

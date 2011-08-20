@@ -18,7 +18,7 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'128M'});
+our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
 our $dbencoding = undef;
 
 our $ttencoding = undef;
