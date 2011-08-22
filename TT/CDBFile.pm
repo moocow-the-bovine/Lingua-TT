@@ -25,7 +25,7 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##   file     => $filename,    ##-- default: undef (none)
 ##   tmpfile  => $tmpfilename, ##-- defualt: "$filename.$$" (not used correctly due to CDB_File bug)
 ##   mode     => $mode,        ##-- open mode 'r', 'w', 'rw', '<', '>', '>>': default='r'
-##   #encoding => $enc,         ##-- if defined, $enc will be used to store db data (uses Encode); default=undef (raw bytes)
+##   utf8     => $bool,        ##-- if true, keys/values are stored as UTF8
 ##   ##
 ##   ##-- low-level data
 ##   data   => \%data,         ##-- tied data (hash)
@@ -37,7 +37,7 @@ sub new {
 		   file    => undef,
 		   tmpfile => undef,
 		   mode    => 'r',
-		   encoding => undef,
+		   utf8    => 1,
 		   ##
 		   data   => undef,
 		   tied   => undef,
@@ -136,6 +136,24 @@ sub sync {
 ##  + copies database data to $file2
 sub copy {
   confess(ref($_[0])."::copy() not implemented");
+}
+
+##==============================================================================
+## Methods: Lookup
+
+## $val = $dbf->fetch($key)
+##   + returns (decoded) value
+sub fetch {
+  return $_[0]{tied}->FETCH($_[1]) if (!$_[0]{utf8});
+  local $_ = $_[0]{tied}->FETCH($_[1]);
+  utf8::decode($_);
+  return $_;
+}
+
+## $val = $dbf->store($key)
+##  + just stores value
+sub store {
+  return $_[0]{tied}->STORE($_[1],$_[2]) if (!$_[0]{utf8});
 }
 
 ##==============================================================================

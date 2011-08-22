@@ -18,8 +18,7 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = qw();
-our $dbencoding    = undef;
+our %dbf           = (utf8=>0);
 
 our $ttencoding = undef;
 our $outfile  = '-';
@@ -33,15 +32,11 @@ GetOptions(##-- general
 	   #'version|V' => \$version,
 	   #'verbose|v=i' => \$verbose,
 
-	   ##-- db options
-	   'db-encoding|dbe=s' => \$dbencoding,
-	   #'db-mmap|mmap|in-memory|inmem|m!' => \$dbmmap,
-
 	   ##-- I/O
 	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	   'output|o=s' => \$outfile,
-	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
-	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
+	   'tt-encoding|encoding|te|ie|oe=s' => sub {$ttencoding=$_[1]; $db{utf8}=1;},
+	   'utf8|u!' => sub {$ttencoding='utf8'; $dbf{utf8}=1; },
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -79,12 +74,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     next if (/^%%/ || /^$/);
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
-    if (defined($dbencoding)) {
-      $a_dict = $tied->FETCH(encode($dbencoding,$text));
-      $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
-    } else {
-      $a_dict = $tied->FETCH($text);
-    }
+    $a_dict = $dbf->fetch($text);
     $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
   }
   continue {
@@ -120,9 +110,8 @@ tt-cdbapply.perl - apply CDB dictionary analyses to TT file(s)
 
  I/O Options:
   -output FILE          ##-- default: STDOUT
-  -encoding ENCODING    ##-- default: raw
-  -dbencoding ENCODING  ##-- default: raw
-  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
+  -encoding ENCODING    ##-- set I/O encoding (default: raw); implies UTF-8 db
+  -empty   , -noempty   ##-- do/don't output empty analyses (default=don't)
 
 =cut
 
