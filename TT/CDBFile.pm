@@ -25,7 +25,7 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##   file     => $filename,    ##-- default: undef (none)
 ##   tmpfile  => $tmpfilename, ##-- defualt: "$filename.$$" (not used correctly due to CDB_File bug)
 ##   mode     => $mode,        ##-- open mode 'r', 'w', 'rw', '<', '>', '>>': default='r'
-##   encoding => $enc,         ##-- if defined, $enc will be used to store db data (uses Encode); default=undef (raw bytes)
+##   #encoding => $enc,         ##-- if defined, $enc will be used to store db data (uses Encode); default=undef (raw bytes)
 ##   ##
 ##   ##-- low-level data
 ##   data   => \%data,         ##-- tied data (hash)
@@ -105,7 +105,7 @@ sub open {
   }
   if ($dbf->{mode} =~ /[\+r<]/) {
     $dbf->{data} = {};
-    $dbf->{tied} = tie(%{$dbf->{data}}, __PACKAGE__."::Tied", $dbf->{file}, $dbf->{encoding}) #$dbf->{tmpfile}
+    $dbf->{tied} = tie(%{$dbf->{data}}, 'CDB_File', $dbf->{file}) #$dbf->{tmpfile}
       or confess(ref($dbf).":open(): could not tie CDB_File for file '$dbf->{file}': $!");
   }
 
@@ -145,51 +145,6 @@ sub copy {
 sub noSaveKeys {
   return qw(data tied writer);
 }
-
-################################################################################
-package Lingua::TT::CDBFile::Tied;
-use CDB_File;
-use Encode qw(encode decode);
-use Carp;
-use strict;
-
-## $tied = TIEHASH($classname, $cdbfile, $encoding)
-##  + $tied = [$cdb_tied,\&fetch_filter,\&store_filter]
-sub TIEHASH {
-  my ($that,$file,$enc) = @_;
-  my $tied0 = CDB_File->TIEHASH($file) or return undef;
-  $enc      = '' if (!defined($enc) || $enc eq 'raw' || $enc eq 'bytes' || $enc eq 'null');
-  return bless([$tied0,$enc], ref($that)||$that);
-}
-
-sub FETCH {
-  return CDB_File::FETCH($_[0][0], $_[1]) if (!$_[0][1]);
-  return decode($_[0][1],CDB_File::FETCH($_[0][0], (utf8::is_utf8($_[1]) ? encode($_[0][1],$_[1]) : $_[1])));
-}
-sub STORE {
-  return CDB_File::STORE($_[0][0], $_[1], $_[2]) if (!$_[0][1]);
-  return CDB_File::STORE($_[0][0], (utf8::is_utf8($_[1]) ? encode($_[0][1],$_[1]) : $_[1]), (utf8::is_utf8($_[2]) ? encode($_[0][1],$_[2]) : $_[2]));
-}
-sub DELETE {
-  return CDB_File::DELETE($_[0][0], $_[1]) if (!$_[0][1]);
-  return decode($_[0][1],CDB_File::DELETE($_[0][0], (utf8::is_utf8($_[1]) ? encode($_[0][1],$_[1]) : $_[1])));
-}
-sub EXISTS {
-  return CDB_File::EXISTS($_[0][0], $_[1]) if (!$_[0][1]);
-  return CDB_File::EXISTS($_[0][0], (utf8::is_utf8($_[1]) ? encode($_[0][1],$_[1]) : $_[1]));
-}
-sub FIRSTKEY {
-  CDB_File::FIRSTKEY($_[0][0]);
-}
-sub NEXTKEY {
-  return CDB_File::NEXTKEY($_[0][0], $_[1]) if (!$_[0][1]);
-  return CDB_File::NEXTKEY($_[0][0], (utf8::is_utf8($_[1]) ? encode($_[0][1],$_[1]) : $_[1]));
-}
-
-#sub SCALAR { CDB_File::SCALAR($_[0][0]); }
-#sub CLEAR { CDB_File::CLEAR($_[0][0]); }
-sub UNTIE { $_[0][0]=undef; }
-
 
 ##==============================================================================
 ## Footer
