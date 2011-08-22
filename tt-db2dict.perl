@@ -63,7 +63,7 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No DB file specified!'}) if (!@ARGV);
 ##-- open db
 my $dbfile = shift(@ARGV);
 our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
-  or die("$prog: could not open or create DB file '$outfile': $!");
+  or die("$prog: could not open DB file '$dbfile': $!");
 our $data = $dbf->{data};
 our $tied = $dbf->{tied};
 

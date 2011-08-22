@@ -2,7 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DBFile;
+use Lingua::TT::CDBFile;
 use Fcntl;
 use Encode qw(encode decode);
 
@@ -18,8 +18,8 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
-our $dbencoding = undef;
+our %dbf           = qw();
+our $dbencoding    = undef;
 
 our $ttencoding = undef;
 our $outfile  = '-';
@@ -34,11 +34,8 @@ GetOptions(##-- general
 	   #'verbose|v=i' => \$verbose,
 
 	   ##-- db options
-	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
-	   'db-option|O=s' => $dbf{dbopts},
 	   'db-encoding|dbe=s' => \$dbencoding,
+	   #'db-mmap|mmap|in-memory|inmem|m!' => \$dbmmap,
 
 	   ##-- I/O
 	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
@@ -48,7 +45,7 @@ GetOptions(##-- general
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No CDB file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
@@ -61,10 +58,10 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 
 ##-- open db
 my $dbfile = shift(@ARGV);
-our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
-  or die("$prog: could not open DB file '$dbfile': $!");
+our $dbf = Lingua::TT::CDBFile->new(%dbf,file=>$dbfile)
+  or die("$prog: could not open CDB file '$dbfile': $!");
 our $data = $dbf->{data};
-#our $tied = $dbf->{tied};
+our $tied = $dbf->{tied};
 
 ##-- open output handle
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
@@ -83,10 +80,10 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
     if (defined($dbencoding)) {
-      $a_dict = $data->{encode($dbencoding,$text)};
+      $a_dict = $tied->FETCH(encode($dbencoding,$text));
       $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
     } else {
-      $a_dict = $data->{$text};
+      $a_dict = $tied->FETCH($text);
     }
     $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
   }
@@ -96,6 +93,8 @@ foreach $infile (@ARGV ? @ARGV : '-') {
   $ttin->close;
 }
 
+undef $data;
+undef $tied;
 $dbf->close;
 $ttout->close;
 
@@ -110,23 +109,19 @@ __END__
 
 =head1 NAME
 
-tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
+tt-cdbapply.perl - apply CDB dictionary analyses to TT file(s)
 
 =head1 SYNOPSIS
 
- tt-dbapply.perl [OPTIONS] DB_FILE [TT_FILE(s)]
+ tt-dbapply.perl [OPTIONS] CDB_FILE [TT_FILE(s)]
 
  General Options:
    -help
 
- DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
-  -db-option OPT=VAL    ##-- set DB_File option
-
  I/O Options:
   -output FILE          ##-- default: STDOUT
-  -encoding ENCODING    ##-- default: UTF-8
+  -encoding ENCODING    ##-- default: raw
+  -dbencoding ENCODING  ##-- default: raw
   -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
 
 =cut

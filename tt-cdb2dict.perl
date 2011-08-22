@@ -2,8 +2,7 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DBFile;
-use Fcntl;
+use Lingua::TT::CDBFile;
 use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
@@ -18,10 +17,9 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
-our $dbencoding = undef;
+our %dbf           = (encoding=>undef);
 
-our $ttencoding = undef;
+our $oencoding = undef;
 our $outfile  = '-';
 
 ##----------------------------------------------------------------------
@@ -34,21 +32,16 @@ GetOptions(##-- general
 	   #'verbose|v=i' => \$verbose,
 
 	   ##-- db options
-	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
-	   'db-option|O=s' => $dbf{dbopts},
-	   'db-encoding|dbe=s' => \$dbencoding,
+	   'db-encoding|dbe|de=s' => \$dbf{encoding},
 
 	   ##-- I/O
-	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	   'output|o=s' => \$outfile,
-	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
-	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
+	   'output-encoding|oencoding|oe=s' => \$oencoding,
+	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No CDB file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
@@ -58,44 +51,27 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 ## MAIN
 ##----------------------------------------------------------------------
 
-
 ##-- open db
 my $dbfile = shift(@ARGV);
-our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
-  or die("$prog: could not open DB file '$dbfile': $!");
+our $dbf = Lingua::TT::CDBFile->new(%dbf,file=>$dbfile,mode=>'<')
+  or die("$prog: could not open or create CDB file '$dbfile': $!");
 our $data = $dbf->{data};
-#our $tied = $dbf->{tied};
+our $tied = $dbf->{tied};
 
 ##-- open output handle
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
+our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$oencoding)
   or die("$0: open failed for '$outfile': $!");
 our $outfh = $ttout->{fh};
 
-##-- process inputs
-our ($text,$a_in,$a_dict);
-foreach $infile (@ARGV ? @ARGV : '-') {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$ttencoding)
-    or die("$0: open failed for '$infile': $!");
-  $infh = $ttin->{fh};
-
-  while (defined($_=<$infh>)) {
-    next if (/^%%/ || /^$/);
-    chomp;
-    ($text,$a_in) = split(/\t/,$_,2);
-    if (defined($dbencoding)) {
-      $a_dict = $data->{encode($dbencoding,$text)};
-      $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
-    } else {
-      $a_dict = $data->{$text};
-    }
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
-  }
-  continue {
-    $outfh->print($_);
-  }
-  $ttin->close;
+##-- dump DB
+my ($key,$val);
+for ($key=$tied->FIRSTKEY; defined($key); $key=$tied->NEXTKEY($key)) {
+  $val = $tied->FETCH($key);
+  $outfh->print($key,"\t",$val,"\n");
 }
 
+undef($data);
+undef($tied);
 $dbf->close;
 $ttout->close;
 
@@ -110,24 +86,20 @@ __END__
 
 =head1 NAME
 
-tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
+tt-cdb2dict.perl - convert CDB dictionary to text
 
 =head1 SYNOPSIS
 
- tt-dbapply.perl [OPTIONS] DB_FILE [TT_FILE(s)]
+ tt-cdb2dict.perl [OPTIONS] CDB_FILE
 
  General Options:
    -help
 
- DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
-  -db-option OPT=VAL    ##-- set DB_File option
-
  I/O Options:
-  -output FILE          ##-- default: STDOUT
-  -encoding ENCODING    ##-- default: UTF-8
-  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
+   -output FILE           ##-- default: STDOUT
+   -db-encoding ENC       ##-- set CDB-internal encoding (default: null)
+   -output-encoding ENC   ##-- output encoding (default: null)
+   -encoding ENC          ##-- alias for -db-encoding=ENC -output-encoding=ENC
 
 =cut
 

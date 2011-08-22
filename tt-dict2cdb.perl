@@ -2,8 +2,9 @@
 
 use lib '.';
 use Lingua::TT;
-use Lingua::TT::DBFile;
-use Fcntl;
+use Lingua::TT::CDBFile;
+#use File::Copy;
+#use File::Temp;
 use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
@@ -17,12 +18,12 @@ use File::Basename qw(basename);
 our $prog = basename($0);
 our $VERSION  = "0.01";
 
-our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
-our $dbencoding = undef;
+our $iencoding = undef;
 
-our $ttencoding = undef;
-our $outfile  = '-';
+our $include_empty = 0;
+our %dbf           = (encoding=>undef);
+our $outfile  = undef; ##-- default: INFILE.cdb
+our $tmpdir   = undef; ##-- build in temp directory (e.g. tmpfs)?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -34,47 +35,43 @@ GetOptions(##-- general
 	   #'verbose|v=i' => \$verbose,
 
 	   ##-- db options
-	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
-	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
-	   'db-option|O=s' => $dbf{dbopts},
-	   'db-encoding|dbe=s' => \$dbencoding,
+	   'append|add|a!' => \$append,
+	   'truncate|trunc|clobber|t!' => sub { $append=!$_[1]; },
+	   'include-empty-analyses|include-empty|empty!' => \$include_empty,
 
 	   ##-- I/O
-	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
-	   'output|o=s' => \$outfile,
-	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
-	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
+	   'input-encoding|iencoding|ie=s' => \$iencoding,
+	   'output-db|output|out|o|odb|db=s' => \$outfile,
+	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbf{encoding},
+	   'encoding|e=s' => sub {$iencoding=$dbf{encoding}=$_[1]},
+	   #'tmpfile|tempfile|tf=s' => \$dbf{tmpfile},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
+#pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!@ARGV);
 
 ##----------------------------------------------------------------------
 ## Subs
-
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
+push(@ARGV,'-') if (!@ARGV);
+
+##-- defaults
+$outfile = $ARGV[0].".cdb"  if (!defined($outfile));
 
 ##-- open db
-my $dbfile = shift(@ARGV);
-our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
-  or die("$prog: could not open DB file '$dbfile': $!");
-our $data = $dbf->{data};
-#our $tied = $dbf->{tied};
+our $dbf = Lingua::TT::CDBFile->new(%dbf)
+  or die("$prog: could not create TT::CDBFile object: $!");
+$dbf->open($outfile, mode=>($append ? '>>' : '>'))
+  or die("$prog: could not open CDB file '$outfile': $!");
+our $writer = $dbf->{writer};
 
-##-- open output handle
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
-  or die("$0: open failed for '$outfile': $!");
-our $outfh = $ttout->{fh};
-
-##-- process inputs
-our ($text,$a_in,$a_dict);
-foreach $infile (@ARGV ? @ARGV : '-') {
-  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$ttencoding)
+##-- process input files
+foreach $infile (@ARGV) {
+  $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$iencoding)
     or die("$0: open failed for '$infile': $!");
   $infh = $ttin->{fh};
 
@@ -82,23 +79,14 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     next if (/^%%/ || /^$/);
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
-    if (defined($dbencoding)) {
-      $a_dict = $data->{encode($dbencoding,$text)};
-      $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
-    } else {
-      $a_dict = $data->{$text};
-    }
-    $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
-  }
-  continue {
-    $outfh->print($_);
+    next if (!defined($a_in) && !$include_empty); ##-- no entry for unanalyzed input
+    $writer->insert($text,$a_in); #or die("$prog: CDB_File::insert() failed: $!");
   }
   $ttin->close;
 }
 
+undef $writer;
 $dbf->close;
-$ttout->close;
-
 
 __END__
 
@@ -110,24 +98,26 @@ __END__
 
 =head1 NAME
 
-tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
+tt-dict2cdb.perl - convert a text dictionary to a CDB_File
 
 =head1 SYNOPSIS
 
- tt-dbapply.perl [OPTIONS] DB_FILE [TT_FILE(s)]
+ tt-dict2cdb.perl OPTIONS [TT_DICT_FILE(s)]
 
  General Options:
    -help
 
- DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
+ DB_File Options:
+  -append , -truncate   ##-- do/don't append to existing db (default=-append)
+  -empty  , -noempty    ##-- do/don't create records for empty analyses
   -db-option OPT=VAL    ##-- set DB_File option
+  -db-encoding ENC      ##-- set DB internal encoding (default: null)
 
  I/O Options:
-  -output FILE          ##-- default: STDOUT
-  -encoding ENCODING    ##-- default: UTF-8
-  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
+   -input-encoding ENC  ##-- set input encoding (default: null)
+   -encoding ENC        ##-- alias for -input-encoding=ENC -db-encoding=ENC
+   -output CDBFILE      ##-- default: STDOUT
+   #-tmpfile TMPFILE     ##-- build temporary CDB as TMPFILE (default=CDBFILE.$$)
 
 =cut
 

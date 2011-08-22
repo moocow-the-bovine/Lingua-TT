@@ -129,9 +129,10 @@ sub close {
 ## $sizeInt = parseSize($sizeString)
 sub parseSize {
   my ($dbf,$str) = @_;
-  if (defined($str) && $str =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/) {
+  if (defined($str) && $str =~ /^\s*([\d\.\+\-eE]*)\s*([BKMGT]?)\s*$/i) {
     my ($size,$suff) = ($1,$2);
     $suff = 'B' if (!defined($suff));
+    $suff = uc($suff);
     $size *= 1024    if ($suff eq 'K');
     $size *= 1024**2 if ($suff eq 'M');
     $size *= 1024**3 if ($suff eq 'G');
