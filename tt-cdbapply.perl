@@ -35,7 +35,7 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	   'output|o=s' => \$outfile,
-	   'tt-encoding|encoding|te|ie|oe=s' => sub {$ttencoding=$_[1]; $db{utf8}=1;},
+	   'tt-encoding|encoding|te|ie|oe=s' => sub {$ttencoding=$_[1]; $dbf{utf8}=1;},
 	   'utf8|u!' => sub {$ttencoding='utf8'; $dbf{utf8}=1; },
 	  );
 
