@@ -16,6 +16,10 @@ WriteMakefile
 		    'File::Basename'=>undef,
 		    'Getopt::Long'=>undef,
 		    'Pod::Usage'=>undef,
+		    ##--
+		    'DB_File' => undef,
+		    'CDB_File' => undef,
+		    ##--
 		    #'Storable'=>undef,
 		    #'PDL' => '2.4.2',
 		    #'PDL::Ngrams' => '0.03',
