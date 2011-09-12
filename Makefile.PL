@@ -31,6 +31,7 @@ WriteMakefile
 
    EXE_FILES    => [
 		    glob('tt*.perl'),
+		    glob('tj*.perl'),
 		    glob('tt*.sh'),
 		    glob('tt*.sed'),
 		    glob('tt*.awk'),

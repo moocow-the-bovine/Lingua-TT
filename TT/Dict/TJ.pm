@@ -1,57 +1,38 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::Enum.pm
+## File: Lingua::TT::Dict::TJ.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
-## Descript: TT Utils: in-memory Enum
+## Descript: TT Utils: dictionary: TJ
 
-package Lingua::TT::Dict;
-use Lingua::TT::Persistent;
+package Lingua::TT::Dict::TJ;
+use Lingua::TT::Dict;
 use Lingua::TT::IO;
+use JSON::XS;
 use Carp;
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
 
-our @ISA = qw(Lingua::TT::Persistent);
+our @ISA = qw(Lingua::TT::Dict);
 
 ##==============================================================================
 ## Constructors etc.
 
 ## $dict = CLASS_OR_OBJECT->new(%opts)
 ## + %opts, %$dict:
-##    dict => \%key2val,  ##-- dict data
+##    dict => \%key2val,  ##-- dict data; values here are json-encoded
 sub new {
   my $that = shift;
-  my $dict = bless({
-		    dict=>{},
-		    @_
-		   }, ref($that)||$that);
-  return $dict;
-}
-
-## undef = $dict->clear()
-sub clear {
-  my $dict = shift;
-  %{$dict->{dict}} = qw();
-  return $dict;
+  return $that->SUPER::new(@_);
 }
 
 ##==============================================================================
 ## Methods: Access and Manipulation
 
-## $n_keys = $dict->size()
-sub size {
-  return scalar CORE::keys %{$_[0]{dict}};
-}
-
-## @keys = $dict->keys()
-sub keys {
-  return CORE::keys %{$_[0]{dict}};
-}
-
-## $val = $dict->get($key)
-sub get {
-  return $_[0]{dict}{$_[1]};
+## $jxs = $obj->jsonxs()
+sub jsonxs {
+  return $_[0]{jxs} if (ref($_[0]) && defined($_[0]{jxs}));
+  return $_[0]{jxs} = JSON::XS->new->utf8(0);
 }
 
 ##==============================================================================
@@ -60,7 +41,7 @@ sub get {
 ## $dict = $dict->merge($dict2, %opts)
 ##  + include $dict2 entries in $dict, destructively alters $dict
 ##  + %opts:
-##     append => $bool,  ##-- if true, $dict2 values are appended to $dict1 values
+##     append => $bool,  ##-- if true, $dict2 values are appended (dict clobber) to $dict1 values
 sub merge {
   my ($d1,$d2,%opts) = @_;
   if (!$opts{append}) {
@@ -68,9 +49,27 @@ sub merge {
   } else {
     my $h1 = $d1->{dict};
     my $h2 = $d2->{dict};
-    my ($key,$val);
-    while (($key,$val)=each %$h2) {
-      $h1->{$key} = exists($h1->{$key}) ? "$h1->{$key}\t$val" : $val;
+    my $jxs = $d1->jsonxs;
+    my ($key,$sval1,$sval2,$val1,$val2);
+    while (($key,$sval2)=each %$h2) {
+      if (!defined($sval1=$h1->{$key})) {
+	$h1->{$key} = $sval2;
+      } else {
+	$val1 = $jxs->decode($sval1);
+	$val2 = $jxs->decode($sval2);
+	if (ref($val1) eq 'HASH' && ref($val2) eq 'HASH') {
+	  @$val1{keys %$val2} = values %$val2;
+	}
+	elsif (ref($val1) eq 'ARRAY' && ref($val2) eq 'ARRAY') {
+	  push(@$val1, @$val2);
+	}
+	else {
+	  warn("cannot merge values $val1, $val2");
+	  $h1->{$key} = $sval2;
+	  next;
+	}
+	$h1->{$key} = $jxs->encode($val1);
+      }
     }
   }
   return $d1;
@@ -85,8 +84,7 @@ sub merge {
 
 ## $bool = $dict->setFhLayers($fh,%opts)
 sub setFhLayers {
-  my ($obj,$fh,%opts) = @_;
-  binmode($fh,":encoding($opts{encoding})") if (defined($opts{encoding}));
+  binmode($_[1],':utf8');
 }
 
 ##--------------------------------------------------------------
@@ -94,11 +92,10 @@ sub setFhLayers {
 
 ## $bool = $dict->saveNativeFh($fh,%opts)
 ## + saves to filehandle
-## + %opts
-##    encoding => $enc,  ##-- sets $fh :encoding flag if defined; default: none
+## + %opts: (none)
 sub saveNativeFh {
   my ($dict,$fh,%opts) = @_;
-  $dict->setFhLayers($fh,%opts);
+  binmode($fh,":utf8");
   my ($key,$val);
   while (($key,$val)=each(%{$dict->{dict}})) {
     $fh->print($key, "\t", $val, "\n");
@@ -112,7 +109,7 @@ sub saveNativeFh {
 ##    encoding => $enc,  ##-- sets $fh :encoding flag if defined; default: none
 sub loadNativeFh {
   my ($dict,$fh,%opts) = @_;
-  $dict->setFhLayers($fh,%opts);
+  binmode($fh,":utf8");
   $dict = $dict->new() if (!ref($dict));
   my $dh = $dict->{dict};
   my ($line,$key,$val);
