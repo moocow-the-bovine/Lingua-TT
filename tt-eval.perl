@@ -13,7 +13,7 @@ use Lingua::TT;
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 ##-- program vars
 our $prog         = basename($0);
@@ -23,6 +23,9 @@ our $verbose      = 0;
 our $encoding = undef; ##-- default encoding (?)
 our $code_byline = undef;
 our $doprint = 1;
+
+our $want_cmts = 0;
+our $want_eos  = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -36,6 +39,8 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'encoding|e:s' => \$encoding,
+	   'comments|cmts|c!' => \$want_cmts,
+	   'eos|s!' => \$want_eos,
 	   'print|p!' => \$doprint,
 	  );
 
@@ -82,7 +87,11 @@ $code_byline = shift;
 our $dofile_code = q(
 sub {
   while (defined($_=<$infh>)) {
-    s/\r?\n?$//s;
+    if ((!$want_cmts && m/^\%\%/) || (!$want_eos && m/^$/)) {
+      print if ($doprint);
+      next;
+    }
+    s/\R\z//s;
     @_ = split(/\t/,$_);
     ##-- BEGIN user code
     ).$code_byline.q(;
@@ -129,6 +138,8 @@ tt-eval.perl - eval perl code for each line of .tt files
    -verbose LEVEL
 
  Other Options:
+   -eos  , -noeos     ##-- do/don't eval CODe for eos lines (default=don't)
+   -cmts , -nocmts    ##-- do/don't eval CODE for comment lines (default=don't)
    -encoding ENCODING ##-- set I/O encoding
    -output OUTFILE    ##-- set output file
    -noprint           ##-- don't implicitly print @_

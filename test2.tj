@@ -1,0 +1,5 @@
+foo	{"blop":"blip"}
+bar	["blip","bloop"]
+baz	["nope"]
+frob	"widget"
+

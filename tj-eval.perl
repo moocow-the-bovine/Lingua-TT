@@ -25,7 +25,10 @@ our $encoding = undef; ##-- default encoding (?)
 our $code_byline = undef;
 our $doprint = 1;
 
-our $jxs = JSON::XS->new->utf8(0);
+our $want_cmts = 0;
+our $want_eos  = 0;
+
+our $jxs = JSON::XS->new->utf8(0)->allow_nonref(1);
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -38,6 +41,8 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
+	   'comments|cmts|c!' => \$want_cmts,
+	   'eos|s!' => \$want_eos,
 	   'print|p!' => \$doprint,
 	  );
 
@@ -85,13 +90,17 @@ $code_byline = shift;
 our $dofile_code = q(
 sub {
   while (defined($_=<$infh>)) {
+    if ((!$want_cmts && m/^\%\%/) || (!$want_eos && m/^$/)) {
+      print if ($doprint);
+      next;
+    }
     s/\R\z//s;
     ($t,$j0)=split(/\t/,$_,2);
     $j = $j0 ? $jxs->decode($j0) : undef;
     ##-- BEGIN user code
     ).$code_byline.q(;
     ##-- END user code
-    ).($doprint ? 'print join("\t",grep {defined($_)} $t,($j ? $jxs->encode($j) : qw())), "\n";' : '').q(
+    ).($doprint ? 'print join("\t",grep {defined($_)} $t, (defined($j) ? $jxs->encode($j) : qw())), "\n";' : '').q(
   }
 });
 vmsg(3,"$prog: DEBUG: User code sub\n",
@@ -134,8 +143,11 @@ tj-eval.perl - eval perl code for each line of .tj files
    -verbose LEVEL
 
  Other Options:
+   -eos  , -noeos     ##-- do/don't eval CODe for eos lines (default=don't)
+   -cmts , -nocmts    ##-- do/don't eval CODE for comment lines (default=don't)
+   -noprint           ##-- don't implicitly print line data
    -output OUTFILE    ##-- set output file
-   -noprint           ##-- don't implicitly print @_
+
 
  Perl Variables:
    $infile : current file

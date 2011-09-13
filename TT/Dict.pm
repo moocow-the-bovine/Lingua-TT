@@ -78,6 +78,47 @@ sub merge {
 
 
 ##==============================================================================
+## Methods: Apply
+
+## \&apply = $dict->applySub(%opts)
+##   + returns a CODE-ref for applying dictionary analysis to a single item
+##   + returned sub is called without arguments
+##     - data line to be analyzed (chomped) is in $_
+##     - output for current data line should be stored in $_
+sub applySub {
+  my ($dict,%opts) = @_;
+  my $dh            = $dict->{dict};
+  my $include_empty = $opts{allow_empty};
+  my ($text,$a_in,$a_dict);
+  return sub {
+    ($text,$a_in) = split(/\t/,$_,2);
+    $a_dict       = $dh->{$text};
+    $_            = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
+  };
+}
+
+## $bool = $dict->apply($infh,$outfh,%opts)
+##  + apply dict to TT data from $infh, writing output to $outfh
+##  + uses $dict->applySub() for actual analysis
+##  + %opts:
+##     allow_empty => $bool,  ##-- include empty analyses? (default=0)
+sub apply {
+  my ($dict,$infh,$outfh,%opts) = @_;
+  $infh     = $infh->{fh}  if (UNIVERSAL::isa($infh,'HASH') && defined($infh->{fh}));
+  $outfh    = $outfh->{fh} if (UNIVERSAL::isa($outfh,'HASH') && defined($outfh->{fh}));
+  my $apply = $dict->applySub(%opts);
+  while (defined($_=<$infh>)) {
+    next if (/^%%/ || /^$/);  ##-- ignore comments and blank lines (pass-through)
+    chomp;
+    $apply->();
+  }
+  continue {
+    $outfh->print($_) or return undef;
+  }
+  return 1;
+}
+
+##==============================================================================
 ## Methods: I/O
 
 ##--------------------------------------------------------------

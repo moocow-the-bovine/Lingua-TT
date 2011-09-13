@@ -83,7 +83,11 @@ sub open {
   if ($io->{encoding}) {
     if ($io->{encoding} eq 'raw') {
       binmode($io->{fh}, ':raw');
-    } else {
+    }
+    elsif ($io->{encoding} eq 'utf8' || $io->{encoding} eq 'UTF-8') {
+      binmode($io->{fh}, ':utf8');
+    }
+    else {
       binmode($io->{fh},":encoding($io->{encoding})");
     }
   }

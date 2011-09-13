@@ -1,9 +1,9 @@
 ## -*- Mode: CPerl -*-
-## File: Lingua::TT::Dict::TJ.pm
+## File: Lingua::TT::Dict::JSON.pm
 ## Author: Bryan Jurish <jurish@uni-potsdam.de>
-## Descript: TT Utils: dictionary: TJ
+## Descript: TT Utils: dictionary: JSON
 
-package Lingua::TT::Dict::TJ;
+package Lingua::TT::Dict::JSON;
 use Lingua::TT::Dict;
 use Lingua::TT::IO;
 use JSON::XS;
@@ -20,7 +20,7 @@ our @ISA = qw(Lingua::TT::Dict);
 
 ## $dict = CLASS_OR_OBJECT->new(%opts)
 ## + %opts, %$dict:
-##    dict => \%key2val,  ##-- dict data; values here are json-encoded
+##    dict => \%key2val,  ##-- dict data; values are refs (encoded/decoded via JSON)
 sub new {
   my $that = shift;
   return $that->SUPER::new(@_);
@@ -32,7 +32,7 @@ sub new {
 ## $jxs = $obj->jsonxs()
 sub jsonxs {
   return $_[0]{jxs} if (ref($_[0]) && defined($_[0]{jxs}));
-  return $_[0]{jxs} = JSON::XS->new->utf8(0);
+  return $_[0]{jxs} = JSON::XS->new->utf8(0)->allow_nonref;
 }
 
 ##==============================================================================
@@ -50,31 +50,74 @@ sub merge {
     my $h1 = $d1->{dict};
     my $h2 = $d2->{dict};
     my $jxs = $d1->jsonxs;
-    my ($key,$sval1,$sval2,$val1,$val2);
-    while (($key,$sval2)=each %$h2) {
-      if (!defined($sval1=$h1->{$key})) {
-	$h1->{$key} = $sval2;
-      } else {
-	$val1 = $jxs->decode($sval1);
-	$val2 = $jxs->decode($sval2);
-	if (ref($val1) eq 'HASH' && ref($val2) eq 'HASH') {
-	  @$val1{keys %$val2} = values %$val2;
-	}
-	elsif (ref($val1) eq 'ARRAY' && ref($val2) eq 'ARRAY') {
+    my ($key,$val1,$val2);
+    while (($key,$val2)=each %$h2) {
+      if (!defined($val1=$h1->{$key})) {
+	$h1->{$key} = $val2;
+      }
+      elsif (ref($val1) eq 'HASH' && ref($val2) eq 'HASH') {
+	@$val1{keys %$val2} = values %$val2;
+      }
+      elsif (ref($val1) eq 'ARRAY' && ref($val2) eq 'ARRAY') {
 	  push(@$val1, @$val2);
-	}
-	else {
-	  warn("cannot merge values $val1, $val2");
-	  $h1->{$key} = $sval2;
-	  next;
-	}
-	$h1->{$key} = $jxs->encode($val1);
+      }
+      else {
+	warn(ref($d1)."::merge(): cannot merge values $val1, $val2 for key '$key'");
+	$h1->{$key} = $val2;
+	next;
       }
     }
   }
   return $d1;
 }
 
+##==============================================================================
+## Methods: Apply
+
+## \&apply = $dict->applySub(%opts)
+##   + returns a CODE-ref for applying dictionary analysis to a single item
+##   + returned sub is called without arguments
+##     - data line to be analyzed (chomped) is in $_
+##     - output for current data line should be stored in $_
+sub applySub {
+  my ($dict,%opts) = @_;
+  my $jxs           = $dict->jsonxs;
+  my $dh            = $dict->{dict};
+  #my $include_empty = $opts{allow_empty};
+  my ($text,$a_in,$a_dict);
+  return sub {
+    ($text,$a_in) = split(/\t/,$_,2);
+    $a_in   = $jxs->decode($a_in) if (defined($a_in));
+    $a_dict = $dh->{$text};
+    if (!defined($a_dict)) {
+      ##-- +in, -dict
+      ;
+    }
+    elsif (!defined($a_in)) {
+      ##-- -in, +dict
+      $a_in = $a_dict;
+    }
+    elsif (ref($a_in) eq 'HASH' && ref($a_dict) eq 'HASH') {
+      ##-- +in, +dict: HASH
+      @$a_in{keys %$a_dict} = values %$a_dict;
+    }
+    elsif (ref($a_in) eq 'ARRAY' && ref($a_dict) eq 'ARRAY') {
+      ##-- +in, +dict: ARRAY
+      push(@$a_in, @$a_dict);
+    }
+    else {
+      ##-- +in, +dict: OTHER
+      warn(ref($dict)."::applySub(): cannot merge values $a_in, $a_dict for key '$text'");
+      $a_in = $a_dict;
+    }
+    $_ = join("\t", $text, (defined($a_in) ? $jxs->encode($a_in) : qw()))."\n";
+  };
+}
+
+## $bool = $dict->apply($infh,$outfh,%opts)
+##  + apply dict to filehandle $fh
+##  + %opts:
+##     allow_empty => $bool,  ##-- include empty analyses? (default=0)
 
 ##==============================================================================
 ## Methods: I/O
@@ -96,9 +139,10 @@ sub setFhLayers {
 sub saveNativeFh {
   my ($dict,$fh,%opts) = @_;
   binmode($fh,":utf8");
+  my $jxs = $dict->jsonxs();
   my ($key,$val);
   while (($key,$val)=each(%{$dict->{dict}})) {
-    $fh->print($key, "\t", $val, "\n");
+    $fh->print($key, "\t", $jxs->encode($val), "\n");
   }
   return $dict;
 }
@@ -110,15 +154,16 @@ sub saveNativeFh {
 sub loadNativeFh {
   my ($dict,$fh,%opts) = @_;
   binmode($fh,":utf8");
-  $dict = $dict->new() if (!ref($dict));
-  my $dh = $dict->{dict};
+  $dict   = $dict->new() if (!ref($dict));
+  my $dh  = $dict->{dict};
+  my $jxs = $dict->jsonxs;
   my ($line,$key,$val);
   while (defined($line=<$fh>)) {
     chomp($line);
     next if ($line =~ /^\s*$/ || $line =~ /^%%/);
     ($key,$val) = split(/\t/,$line,2);
     next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
-    $dh->{$key} = $val;
+    $dh->{$key} = $jxs->decode($val);
   }
   return $dict;
 }

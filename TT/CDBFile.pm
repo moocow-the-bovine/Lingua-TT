@@ -4,17 +4,16 @@
 ## Descript: TT I/O: CDB: tied read-only access via CDB_File
 
 package Lingua::TT::CDBFile;
-use Lingua::TT::Persistent;
+use Lingua::TT::Dict;
 use CDB_File;
 use Carp;
 use IO::File;
-use Encode qw(encode decode);
 use strict;
 
 ##==============================================================================
 ## Globals & Constants
 
-our @ISA = qw(Lingua::TT::Persistent);
+our @ISA = qw(Lingua::TT::Dict);
 
 ##==============================================================================
 ## Constructors etc.
@@ -25,12 +24,14 @@ our @ISA = qw(Lingua::TT::Persistent);
 ##   file     => $filename,    ##-- default: undef (none)
 ##   tmpfile  => $tmpfilename, ##-- defualt: "$filename.$$" (not used correctly due to CDB_File bug)
 ##   mode     => $mode,        ##-- open mode 'r', 'w', 'rw', '<', '>', '>>': default='r'
-##   utf8     => $bool,        ##-- if true, keys/values are stored as UTF8
+##   utf8     => $bool,        ##-- if true, keys/values are stored as UTF8 (default=1)
 ##   ##
 ##   ##-- low-level data
 ##   data   => \%data,         ##-- tied data (hash)
 ##   tied   => $ref,           ##-- read-only: reference returned by tie()
 ##   writer => $ref,           ##-- read/write: reference returned by CDB_File::new()
+##   fetch  => \&fetch,        ##-- fetch subroutine: $val = $fetch->($key)
+##   store  => \&store,        ##-- store subroutine: $val = $store->($key,$val)#
 sub new {
   my $that = shift;
   my $dbf = bless({
@@ -73,6 +74,7 @@ sub close {
   my $dbf = shift;
   return $dbf if (!$dbf->opened);
   $dbf->{writer}->finish() if ($dbf->{writer});
+  delete(@$dbf{qw(fetch store)});
   if (defined($dbf->{tied})) {
     $dbf->{tied} = undef;
     untie(%{$dbf->{data}});
@@ -98,7 +100,7 @@ sub open {
   }
 
   ##-- tie data hash
-  delete(@$dbf{qw(writer data tied)});
+  delete(@$dbf{qw(writer data tied fetch store)});
   if ($dbf->{mode} =~ /[\+w>]/) {
     $dbf->{writer} = CDB_File->new($dbf->{file}, $dbf->{tmpfile})
       or confess(ref($dbf)."::open(): CDB_File->new() failed for '$dbf->{file}': $!");
@@ -108,6 +110,10 @@ sub open {
     $dbf->{tied} = tie(%{$dbf->{data}}, 'CDB_File', $dbf->{file}) #$dbf->{tmpfile}
       or confess(ref($dbf).":open(): could not tie CDB_File for file '$dbf->{file}': $!");
   }
+
+  ##-- set fetch/store closures
+  $dbf->{fetch} = $dbf->fetchSub();
+  $dbf->{store} = $dbf->storeSub();
 
   return $dbf;
 }
@@ -139,29 +145,77 @@ sub copy {
 }
 
 ##==============================================================================
+## Methods: Lookup: Closures
+
+## \&sub = $dbf->fetchSub($key)
+##   + subroutine to return (decoded) value
+sub fetchSub {
+  my $tied = $_[0]{tied};
+  if ($_[0]{utf8}) {
+    ##-- TT mode, utf8
+    return sub {
+      local $_ = $_[0]{tied}->FETCH($_[1]);
+      utf8::decode($_);
+      return $_;
+    };
+  }
+  ##-- TT mode, raw
+  return sub {
+    return $tied->FETCH($_[1]);
+  };
+}
+
+## $storeSub = $dbf->store($key,$val)
+sub storeSub {
+  my $tied = $_[0]{tied};
+  return sub {
+    return $tied->STORE($_[0],$_[1]);
+  };
+}
+
+##==============================================================================
 ## Methods: Lookup
 
 ## $val = $dbf->fetch($key)
 ##   + returns (decoded) value
 sub fetch {
-  return $_[0]{tied}->FETCH($_[1]) if (!$_[0]{utf8});
-  local $_ = $_[0]{tied}->FETCH($_[1]);
-  utf8::decode($_);
-  return $_;
+  return $_[0]{fetch}->($_[1]);
 }
 
 ## $val = $dbf->store($key)
 ##  + just stores value
 sub store {
-  return $_[0]{tied}->STORE($_[1],$_[2]) if (!$_[0]{utf8});
+  return $_[0]{store}->($_[1],$_[2]);
 }
+
+##==============================================================================
+## Methods: Apply
+
+## \&apply = $dict->applySub(%opts)
+##   + returns a CODE-ref for applying dictionary analysis to a single item
+##   + returned sub is called without arguments
+##     - data line to be analyzed (chomped) is in $_
+##     - output for current data line should be stored in $_
+sub applySub {
+  my ($dict,%opts) = @_;
+  my $fetch         = $dict->{fetch};
+  my $include_empty = $opts{allow_empty};
+  my ($text,$a_in,$a_dict);
+  return sub {
+    ($text,$a_in) = split(/\t/,$_,2);
+    $a_dict       = $fetch->($text);
+    $_            = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
+  };
+}
+
+
 
 ##==============================================================================
 ## Methods: TT::Persistent
 
 ## @keys = $dbf->noSaveKeys()
 sub noSaveKeys {
-  return qw(data tied writer);
+  return qw(data tied writer fetch store);
 }
 
 ##==============================================================================

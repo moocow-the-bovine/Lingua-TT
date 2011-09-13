@@ -1,6 +1,6 @@
-Foo	FOO	A	B	C
-Bar	BAR	D	E
-Baz	BAZ	F
+foo	FOO	A	B	C
+bar	BAR	D	E
+baz	BAZ	F
 
 
 %% a lonely comment

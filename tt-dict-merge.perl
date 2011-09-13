@@ -16,6 +16,7 @@ our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = '-';
 our $append   = 0;
+our $use_json = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -24,6 +25,7 @@ GetOptions(##-- general
 	   'help|h' => \$help,
 
 	   ##-- I/O
+	   'json|tj|j!' => \$use_json,
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
 	   'append|a!' => \$append,
@@ -40,10 +42,12 @@ pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 ## MAIN
 ##----------------------------------------------------------------------
 
-##-- i/o
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$encoding)
-  or die("$0: open failed for '$outfile': $!");
-our $outfh = $ttout->{fh};
+##-- get dict class
+our $dclass = "Lingua::TT::Dict";
+if ($use_json) {
+  require Lingua::TT::Dict::JSON;
+  $dclass = "Lingua::TT::Dict::JSON";
+}
 
 ##-- create dict
 my ($dict);
@@ -51,8 +55,8 @@ my ($dict);
 ##-- munge arguments
 push(@ARGV,'-') if (!@ARGV);
 foreach $dictfile (@ARGV) {
-  my $d2 = Lingua::TT::Dict->loadFile($dictfile,encoding=>$encoding)
-    or die("$0: load failed for file '$dictfile': $!");
+  my $d2 = $dclass->loadFile($dictfile,encoding=>$encoding)
+    or die("$0: ${dclass}::loadFile() failed for file '$dictfile': $!");
 
   if (!defined($dict)) {
     $dict = $d2;
@@ -61,7 +65,7 @@ foreach $dictfile (@ARGV) {
   }
 }
 
-$dict = Lingua::TT::Dict->new if (!$dict);
+$dict = $dclass->new if (!$dict);
 
 ##-- dump
 $dict->saveFile($outfile,encoding=>$encoding);
@@ -88,6 +92,7 @@ tt-dict-merge.perl - merge text-keyed TT dictionary files
  I/O Options:
   -output FILE         ##-- default: STDOUT
   -encoding ENCODING   ##-- default: UTF-8
+  -json    , -nojson   ##-- do/don't store values as JSON (default=don't)
   -append  , -clobber  ##-- append or clobber old analyses for multiple entries? (default=-clobber)
 
 =cut
