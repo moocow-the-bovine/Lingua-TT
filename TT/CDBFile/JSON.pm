@@ -66,7 +66,9 @@ sub fetchSub {
   my $jxs  = $_[0]->jsonxs;
   my ($val);
   return sub {
-    return defined($val=$tied->FETCH($_[0])) ? $jxs->decode($val) : undef;
+    return undef if (!defined($val = $tied->FETCH($_[0])));
+    utf8::decode($val);
+    return $jxs->decode($val);
   };
 }
 
@@ -88,8 +90,9 @@ sub storeSub {
 ##     - data line to be analyzed (chomped) is in $_
 ##     - output for current data line should be stored in $_
 sub applySub {
-  my ($dict,%opts) = @_;
+  my ($dict,%opts)  = @_;
   my $jxs           = $dict->jsonxs;
+  my $jxs0          = JSON::XS->new->utf8(1)->allow_nonref(1);
   my $tied          = $dict->{tied};
   #my $include_empty = $opts{allow_empty};
   my ($text,$a_in,$a_dict);
@@ -98,7 +101,7 @@ sub applySub {
     $a_dict       = $tied->FETCH($text);
 
     $a_in   = $jxs->decode($a_in) if (defined($a_in));
-    $a_dict = $jxs->decode($a_dict) if (defined($a_dict));
+    $a_dict = $jxs0->decode($a_dict) if (defined($a_dict));
 
     if (!defined($a_dict)) {
       ##-- +in, -dict
