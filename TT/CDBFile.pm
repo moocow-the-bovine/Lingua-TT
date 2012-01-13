@@ -154,7 +154,7 @@ sub fetchSub {
   if ($_[0]{utf8}) {
     ##-- TT mode, utf8
     return sub {
-      local $_ = $_[0]{tied}->FETCH($_[1]);
+      local $_ = $tied->FETCH($_[1]);
       utf8::decode($_);
       return $_;
     };
