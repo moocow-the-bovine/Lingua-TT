@@ -103,6 +103,7 @@ tt-cdbapply.perl - apply CDB dictionary analyses to TT file(s)
  I/O Options:
   -output FILE          ##-- default: STDOUT
   -encoding ENCODING    ##-- set I/O encoding (default: raw); implies UTF-8 db
+  -utf8    , -noutf8    ##-- do/don't assume DB is UTF-8 (default=don't)
   -empty   , -noempty   ##-- do/don't output empty analyses (default=don't)
   -json    , -nojson    ##-- do/don't assume JSON values (default=don't)
 
