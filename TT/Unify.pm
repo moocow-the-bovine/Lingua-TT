@@ -10,8 +10,13 @@ package Lingua::TT::Unify;
 use Storable;
 use Exporter;
 use Carp;
-use UNIVERSAL qw(isa can);
+use UNIVERSAL;
 use strict;
+
+BEGIN {
+  *isa = \&UNIVERSAL::isa;
+  *can = \&UNIVERSAL::can;
+}
 
 ##======================================================================
 ## Globals
@@ -95,7 +100,7 @@ sub _unify_guts {
     elsif (!ref($$x) && !ref($$y)) {                 ##-- Case: ($x,$y)
       $$x = $uscalar->($$x,$$y);
     }
-    elsif (UNIVERSAL::isa($$x,'Regexp') || UNIVERSAL::isa($$y,'Regexp')) { ##-- Case: (qr//,qr//)
+    elsif (isa($$x,'Regexp') || isa($$y,'Regexp')) { ##-- Case: (qr//,qr//)
       $$x = $uscalar->($$x,$$y);
       bless($$x,ref($$y)) if (ref($$y) ne 'Regexp');
     }

@@ -144,7 +144,7 @@ foreach $dfile (@ARGV) {
 		(map {
 		  sprintf("$lfmt: $iffmt\n",  ('   - '.$_), $fix1{$_}, pct($fix1{$_},$nbad1), $fix2{$_}, pct($fix2{$_},$nbad2)),
 		} sort(keys(%fix1))),
-		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix1, pct($nnofix1,$nbad2), $nnofix2, pct($nnofix2,$nbad2)),
+		sprintf("$lfmt: $iffmt\n",  ' + Unfixed', $nnofix1, pct($nnofix1,$nbad1), $nnofix2, pct($nnofix2,$nbad2)),
 	       );
 }
 
