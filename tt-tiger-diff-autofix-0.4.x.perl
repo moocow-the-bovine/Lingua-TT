@@ -141,7 +141,7 @@ foreach $hunk (@$hunks) {
   elsif ($op eq 'c'
       && @items1==(grep {/^\%\%/ || /^\d+\tCARD$/} @items1)
       && @items2==1
-      && $items2[0] =~ /^\d[\d\_]+(?:\t.*)?\tCARD(?:\t|$)/)
+      && $items2[0] =~ /^\d[\d\_]+(?:\t.*)?\t\[CARD\](?:\t|$)/)
     {
       $item2 = $items2[0];
       $item2 =~ s/\t.*//;
