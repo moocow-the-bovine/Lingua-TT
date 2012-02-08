@@ -26,8 +26,6 @@ our %saveargs     = (shared=>1, context=>undef, syntax=>1);
 our $select_code = '';
 our $select_other = 0;
 
-our $do_drop = 1;
-
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
@@ -45,8 +43,6 @@ GetOptions(##-- general
 	   'comment|cmt|c=s' => sub { $select_code .= 'return 1 if (($cmt||"") =~ m/'.$_[1].'/o);'; },
 	   'eval-code|E|code|C=s' => sub { $select_code .= $_[1]; },
 	   'other|O!' => \$select_other,
-	   'unfix|break|b' => sub { $do_drop=!$_[1]; },
-	   'drop|delete|d' => \$do_drop,
 
 	   ##-- I/O
 	   'shared|s!' => \$saveargs{shared},
@@ -81,16 +77,14 @@ $diff->loadTextFile($dfile)
 
 ##-- select
 our ($seq1,$seq2,$aux1,$aux2,$hunks) = @$diff{qw(seq1 seq2 aux1 aux2 hunks)};
-our @selected = qw();
 foreach $hunk (@$hunks) {
   ($op,$min1,$max1,$min2,$max2,$fix,$cmt) = @$hunk;
-  if ($select_sub->()) {
-    push(@selected, $hunk) if ($do_drop);
-  } elsif (!$do_drop) {
-    $hunk->[5] = 0;
+  if (!$select_sub->()) {
+    ##-- break this hunk
+    $fix = 0;
   }
+  @$hunk = ($op,$min1,$max1,$min2,$max2,$fix,$cmt);
 }
-$diff->{hunks} = \@selected if ($do_drop);
 
 ##-- dump
 $diff->saveTextFile($outfile, %saveargs)
@@ -126,7 +120,6 @@ tt-diff-select.perl - select certain hunks of a tt-diff
    -cmt=REGEX           ##-- select hunks with FIX=~REGEX (slash-quoted)
    -code=CODE           ##-- select hunks via perl code (return true to select, false to ignore)
    -other , -noother    ##-- select remaining hunks too (default=-noother)?
-   -break , -drop       ##-- how to handle unselected hunks: un-fix or delete (default=-drop)
 
  I/O Options:
    -header , -noheader  ##-- do/don't output header comments (default=do)
