@@ -53,6 +53,7 @@ our $DIFF = 'diff'; ##-- search in path
 ##                        ##    'd' (delete): Delete  @$seq1[$min1..$max1], align after ($min2==$max2) of $seq2
 ##                        ##    'c' (change): Replace @$seq1[$min1..$max1] with @$seq2[$min2..$max2]
 ##                        ## + $fix is one of:
+##                        ##         0  : unresolved
 ##                        ##    $which  : int (1 or 2): use corresponding item(s) of "seq${which}"
 ##                        ##    \@items : ARRAY-ref: resolve conflict with \@items
 ##                        ## + $cmt is a comment for the fix
@@ -537,14 +538,13 @@ sub saveTextFile {
 	     "%% File Format:\n",
 	     "%%  \% COMMENT                           : comment\n",
 	     "%%  \$ NAME: VALUE                       : ".ref($diff)." object data field\n",
-	     "%%  \@ OP MIN1,MAX1 MIN2,MAX2 :FIX? CMT? : diff hunk address (0-based), fix which or '\@'\n",
+	     "%%  \@ OP MIN1,MAX1 MIN2,MAX2 :FIX? CMT? : diff hunk address (0-based), fix = '0' (none), '\@' (user), '1' or '2' (file)\n",
 	     "%%  < LINE1                             : (\"deleted\")  line in file1 only\n",
 	     "%%  > LINE2                             : (\"inserted\") line in file2 only\n",
-	     "%%  > LINE2                             : (\"inserted\") line in file2 only\n",
 	     "%%  ~ LINE_BOTH                         : (\"matched\")  with field prefixes)\n",
-	     "%%  = LINE_FIXED                        : (\"fixed\")    conflict resolution\n",
-	     "%%  #< AUX1                             : (\"ignored\")  diff-irrelevant line from file1\n",
-	     "%%  #> AUX2                             : (\"ignored\")  diff-irrelevant line from file2\n",
+	     "%%  = LINE_FIXED                        : (\"fixed\")    conflict resolution for FIX=\@\n",
+	     "%%  #< AUX1                             : (\"ignored1\") diff-irrelevant line from file1\n",
+	     "%%  #> AUX2                             : (\"ignored2\") diff-irrelevant line from file2\n",
 	     (("%" x 80), "\n"),
 	    ) if ($opts{syntax});
 

@@ -20,9 +20,13 @@ our $progname     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
-our %ioargs       = (encoding=>'UTF-8');
+our %diffargs     = qw();
 our %saveargs     = (shared=>1, context=>undef, syntax=>1);
-our %diffargs     = (auxEOS=>1, auxComments=>1, diffopts=>'');
+
+our $select_code = '';
+our $select_other = 0;
+
+our $do_drop = 1;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -33,22 +37,27 @@ GetOptions(##-- general
 	   'version|V' => \$version,
 	   'verbose|v=i' => \$verbose,
 
-	   ##-- misc
-	   'output|o=s' => \$outfile,
-	   'encoding|e=s' => \$ioargs{encoding},
+	   ##-- selection
+	   '0' => sub { $select_code .= 'return 1 if (!$fix);' },
+	   '1' => sub { $select_code .= 'return 1 if ($fix && $fix eq 1);' },
+	   '2' => sub { $select_code .= 'return 1 if ($fix && $fix eq 2);' },
+	   'at|array|a' => sub { $select_code .= 'return 1 if (ref($fix) && ref($fix) eq "ARRAY");' },
+	   'comment|cmt|c=s' => sub { $select_code .= 'return 1 if (($cmt||"") =~ m/'.$_[1].'/o);'; },
+	   'eval-code|E|code|C=s' => sub { $select_code .= $_[1]; },
+	   'other|O!' => \$select_other,
+	   'unfix|break|b' => sub { $do_drop=!$_[1]; },
+	   'drop|delete|d' => \$do_drop,
+
+	   ##-- I/O
 	   'shared|s!' => \$saveargs{shared},
-	   'keep|K!'  => \$diffargs{keeptmp},
-	   'eos|E!'   => sub { $diffargs{auxEOS}=!$_[1]; },
-	   'comments|cmts|cmt|C!'   => sub { $diffargs{auxComments}=!$_[1]; },
-	   'context|c|k=i' => \$saveargs{context},
+	   'context|k=i' => \$saveargs{context},
 	   'header|syntax|S!' => \$saveargs{syntax},
-	   'diff-options|D' => \$diffargs{diffopts},
-	   'minimal|d' => sub { $diffargs{diffopts} .= ' -d'; },
+	   'output|o=s' => \$outfile,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
-pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
+#pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
 if ($version || $verbose >= 2) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
@@ -58,13 +67,34 @@ if ($version || $verbose >= 2) {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-our ($file1,$file2) = @ARGV;
+push(@ARGV,'-') if (!@ARGV);
+
+##-- compile select sub
+our ($op,$min1,$max1,$min2,$max2,$fix,$cmt);
+our $select_sub = eval "sub { $select_code; return ".($select_other ? '1' : '0')."; };";
+die "$0: could not compile select sub '$select_code': $@" if (!$select_sub);
+
 our $diff = Lingua::TT::Diff->new(%diffargs);
-$diff->compare($file1,$file2, %ioargs)
-  or die("$0: diff->compare() failed: $!");
+our $dfile = shift(@ARGV);
+$diff->loadTextFile($dfile)
+  or die("$0: load failed from '$dfile': $!");
+
+##-- select
+our ($seq1,$seq2,$aux1,$aux2,$hunks) = @$diff{qw(seq1 seq2 aux1 aux2 hunks)};
+our @selected = qw();
+foreach $hunk (@$hunks) {
+  ($op,$min1,$max1,$min2,$max2,$fix,$cmt) = @$hunk;
+  if ($select_sub->()) {
+    push(@selected, $hunk) if ($do_drop);
+  } elsif (!$do_drop) {
+    $hunk->[5] = 0;
+  }
+}
+$diff->{hunks} = \@selected if ($do_drop);
+
+##-- dump
 $diff->saveTextFile($outfile, %saveargs)
   or die("$0: diff->saveTextFile() failed for '$outfile': $!");
-
 
 __END__
 
@@ -76,29 +106,39 @@ __END__
 
 =head1 NAME
 
-tt-diff.perl - diff of TT file(s) keyed by token text
+tt-diff-select.perl - select certain hunks of a tt-diff
 
 =head1 SYNOPSIS
 
- tt-diff.perl OPTIONS [TTFILE(s)]
+ tt-diff-apply.perl OPTIONS [TT_DIFF_FILE]
 
  General Options:
    -help
    -version
    -verbose LEVEL
 
- Other Options:
-   -output FILE         ##-- output file (default: STDOUT)
-   -encoding ENC        ##-- input encoding (default: UTF-8) [output is always UTF-8]
-   -D DIFF_OPTIONS      ##-- pass DIFF_OPTIONS to GNU diff
-   -minimal             ##-- alias for -D='-d'
-   -context K           ##-- set output context size (default=-1: all)
+ Selection Options:
+   -fix=WHICH           ##-- select hunks with FIX==WHICH (0,1,2)
+   -0                   ##-- ... alias for -fix=0
+   -1                   ##-- ... alias for -fix=1
+   -2                   ##-- ... alias for -fix=2
+   -at                  ##-- select hunks with FIX==@ (explicit resolution with '=')
+   -cmt=REGEX           ##-- select hunks with FIX=~REGEX (slash-quoted)
+   -code=CODE           ##-- select hunks via perl code (return true to select, false to ignore)
+   -other , -noother    ##-- select remaining hunks too (default=-noother)?
+   -break , -drop       ##-- how to handle unselected hunks: un-fix or delete (default=-drop)
+
+ I/O Options:
    -header , -noheader  ##-- do/don't output header comments (default=do)
    -shared , -noshared  ##-- do/don't output shared data lines (default=do)
-   -files  , -nofiles   ##-- do/don't output filenames (default=do)
-   -keep   , -nokeep    ##-- do/don't keep temp files (default=don't)
-   -eos    , -noeos     ##-- do/don't treat EOS as ordinary token (default=do)
-   -cmt    , -nocmt     ##-- do/don't treat comments as ordinary tokens (default=do)
+   -context=K           ##-- set output context size (default=-1: all)
+   -output FILE         ##-- output file (default: STDOUT)
+
+ Perl Code variables:
+   $diff                                ##-- global diff object
+   $seq1,$seq2,$aux1,$aux2,$hunks       ##-- global diff properties
+   $hunk                                ##-- current hunk
+   $op,$min1,$max,$min2,$max2,$fix,$cmt ##-- current hunk properties
 
 =cut
 
