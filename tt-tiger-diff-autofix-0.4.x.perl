@@ -177,6 +177,19 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:punctGroup';
     }
+  ##-- CHANGE: annoying quote assimilation: $1 ~ (*/* ''/$() & 2 ~ (*'/- '/$() --> $1
+  elsif ($op eq 'c'
+	 && @items1==2
+	 && @items2==2
+	 && $items1[1] =~ /^\'\'\t\$\(/
+	 && defined($w1 = ($items1[0] =~ /^(\S+)\t/ ? $1 : undef))
+	 && $items2[0] eq "$w1'"
+	 && $items2[1] =~ /^\'\t/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1,($items2[1]=~/\t(.*)$/ ? $1 : undef));
+      $hunk->[6] = "H:quotAssim";
+    }
   ##-- MISC: force pseudo-$1
   elsif ($fix_all) {
     $hunk->[5] = makefix(\@items1,\@items2,1);
