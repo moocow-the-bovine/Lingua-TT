@@ -139,9 +139,9 @@ foreach $hunk (@$hunks) {
     }
   ##-- CHANGE: Numeric Grouping: $1 ~ ((%%*|CARD)+) & $2 ~ (*/CARD) -> $2
   elsif ($op eq 'c'
-      && @items1==(grep {/^\%\%/ || /^\d+\tCARD$/} @items1)
-      && @items2==1
-      && $items2[0] =~ /^\d[\d\_]+(?:\t.*)?\t\[CARD\](?:\t|$)/)
+	 && @items1==(grep {/^\%\%/ || /^[\d\,]+\tCARD$/} @items1)
+	 && @items2==1
+	 && $items2[0] =~ /^\d[\d\,\_]+(?:\t.*)?\t\[CARD\](?:\t|$)/)
     {
       $item2 = $items2[0];
       $item2 =~ s/\t.*//;
@@ -190,6 +190,44 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[5][1] .= "\t>$1" if ($items2[1]=~/\t(.*)$/);
       $hunk->[6] = "H:quotAssim";
+    }
+  ##-- CHANGE: timeGroup
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2==2
+	 && $items1[0] =~ /^[0-9]{1,2}\.[0-9]{2}\tCARD$/
+	 && $items2[0] =~ /^[0-9]{1,2}\.\t\[ORD\]$/
+	 && $items2[1] =~ /^[0-9]{2}\t\[CARD\]$/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][0] .= "\t>$1" if ($items2[1]=~/\t(.*)$/); ##-- analysis
+      $hunk->[6] = "H:timeGroup";
+    }
+  ##-- CHANGE: mis-recognized ABBR at EOS
+  elsif ($op eq 'c'
+	 && @items1==2
+	 && @items2==1
+	 && $items1[1] =~ /^[[:punct:]]\t\$\.$/
+	 && $items2[0] =~ /^[^\t]*[^[:punct:]]+[^\t]*[[:punct:]]\t.*(?:XY|\$ABBREV)/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][1] .= "\t>\$\."; ##-- add analysis for EOS punctuation
+      $hunk->[6] = "H:eosAbbr";
+    }
+  ##-- CHANGE: mis-recognized ORD at EOS
+  elsif ($op eq 'c'
+	 && @items1==2
+	 && @items2==1
+	 #&& $items1[0] =~ /^[\d\,]+\tCARD$/
+	 && $items1[1] =~ /^\.\t\$\.$/
+	 && $items2[0] =~ /^[^\t]+\.\t\[ORD\]$/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][1] .= "\t>\$\."; ##-- add analysis for EOS punctuation
+      $hunk->[6] = "H:ordAbbr";
     }
   ##-- MISC: force pseudo-$1
   elsif ($fix_all) {
