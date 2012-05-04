@@ -507,7 +507,7 @@ sub singleString {
   my ($diff,$which,$i) = @_;
   my $chr = $which==1 ? '<' : '>';
   return join("\n",
-	      ($diff->{"aux${which}"}{$i} ? (map {"#${chr} $_"} @{$diff->{aux}{$i}}) : qw()),
+	      ($diff->{"aux${which}"}{$i} ? (map {"#${chr} $_"} @{$diff->{"aux${which}"}{$i}}) : qw()),
 	      ($i <= $#{$diff->{"seq${which}"}} ? ("${chr} ".$diff->{"seq${which}"}[$i]) : qw()),
 	     )."\n";
 }
