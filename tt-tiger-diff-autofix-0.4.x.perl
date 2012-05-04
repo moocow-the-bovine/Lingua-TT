@@ -129,6 +129,17 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2, 2,'CARD');
       $hunk->[6] = 'H:numGroup';
     }
+  ##-- CHANGE: numCommaDash: $1 ~ (\d+,-/CARD) --> $1 + ">[CARD]"
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2 >1
+	 && $items1[0] =~ /^\d+\,\-\tCARD$/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2, 1);
+      $hunk->[5][0] .= "\t>[CARD]";
+      $hunk->[6] = 'H:numCommaDash';
+    }
   ##-- CHANGE: ordinal grouping: $1 ~ ((*/CARD)+ *./ADJA) & $2 ~ (*/ORD) -> $2 + "<ADJA"
   elsif ($op eq 'c'
 	 && @items1 >1
@@ -303,6 +314,18 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:aposGen';
+    }
+  ##-- CHANGE: tigerEOS: $1 ~ (*/* ./$.) & 2 ~ (*./ORD) --> $1 + "<[$.]"
+  elsif ($op eq 'c'
+	 && @items1==2
+	 && @items2==1
+	 && $items1[1] eq ".\t\$."
+	 && $items2[0] =~ /^[^\t]+\.\t\[ORD\]$/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][1] .= "\t>[\$.]"; ##-- append "tokenizer"-supplied analysis
+      $hunk->[6] = 'H:tigerEOS';
     }
   ##-- MISC: force pseudo-$1
   elsif ($fix_all) {
