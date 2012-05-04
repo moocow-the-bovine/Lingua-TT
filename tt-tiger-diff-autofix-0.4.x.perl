@@ -141,6 +141,27 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2, 2,'ADJA');
       $hunk->[6] = 'H:ordGroup';
     }
+  ##-- CHANGE: sick bad ugly & wrong num group + ord + eos (tiger s9285-9286)
+  elsif ($op eq 'c'
+	 && @items1==5
+	 && @items2==2
+	 && 4==(grep {$_=~/\tCARD$/} @items1[0,1,3,4])
+	 && $items1[2] eq ".\t\$."
+	 && $items2[0] =~ /^[\d\,\_]+\.\t\[ORD\]$/
+	 && $items2[1] =~ /^[\d\,\_]+\t\[CARD\]$/
+	 && $diff->{aux1}{$min1+3}
+	)
+    {
+      (my $txt0 = $items2[0]) =~ s/\.\t.*$//;
+      (my $txt1 = $items2[1]) =~ s/\t.*$//;
+      $hunk->[5] = [
+		    "$txt0\t<CARD\t>[CARD]", ".\t<\$.\t>[\$.]",
+		    @{$diff->{aux1}{$min1+3}},
+		    "$txt1\t<CARD\t>[CARD]"
+		   ];
+      $hunk->[6] = "H:numGroupEOS";
+      delete($diff->{aux1}{$min1+3});
+    }
   ##-- CHANGE: quote assimilation: $1 ~ (*/* ''/$() & 2 ~ (*'/- '/$() --> $1 [mantis bug #537]
   elsif ($op eq 'c'
 	 && @items1==2
