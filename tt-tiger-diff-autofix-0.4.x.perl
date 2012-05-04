@@ -117,26 +117,6 @@ foreach $hunk (@$hunks) {
 
   ##-- dummy
   if (0) { ; }
-  ##-- DELETE: $1 ~ cmt|eos -> $1  :DISABLED
-  elsif (0 && $op eq 'd' && @items1==(grep {/^(?:\%\%|$)/} @items1))
-    {
-      @$hunk[5,6] = (1,'H:cmt|eos/1');
-    }
-  ##-- INSERT: $2 ~ cmt|eos -> $1  :DISABLED
-  elsif (0 && $op eq 'a' && @items2==(grep {/^(?:\%\%|$)/} @items2))
-    {
-      @$hunk[5,6] = (1,'H:cmt|eos/2');
-    }
-  ##-- DELETE: $1 ~ (''|")/* @eos -> $1  :DISABLED
-  elsif (0 && $op eq 'd' && @items1==1 && $items1[0]=~/^(?:\'\'|\")\t/ && ($max1==$#$seq1 || $seq1->[$max1+1]=~/^$/))
-    {
-      @$hunk[5,6] = (1,'H:quot1@eos');
-    }
-  ##-- INSERT: $2 ~ (''|")/* @bos -> $1  :DISABLED
-  elsif (0 && $op eq 'a' && @items2==1 && $items2[0]=~/^(?:\'\'|\")(?:\t|$)/ && ($min2==0 || $seq2->[$min2-1]=~/^$/))
-    {
-      @$hunk[5,6] = (1,'H:quot2@bos');
-    }
   ##-- CHANGE: Numeric Grouping: $1 ~ ((%%*|CARD)+) & $2 ~ (*/CARD) -> $2
   elsif ($op eq 'c'
 	 && @items1==(grep {/^\%\%/ || /^[\d\,]+\tCARD$/} @items1)
@@ -149,35 +129,19 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2, 2,'CARD');
       $hunk->[6] = 'H:numGroup';
     }
-  ##-- CHANGE: Numeric separation: $1 ~ (*[[:digit:]]*/*) & $2 ~ (...) -> $1 : DISABLED
-  elsif (0 && $op eq 'c'
-	 && @items1==1
-	 && $items1[0] =~ /^[^\t]*\d/)
+  ##-- CHANGE: ordinal grouping: $1 ~ ((*/CARD)+ *./ADJA) & $2 ~ (*/ORD) -> $2 + "<ADJA"
+  elsif ($op eq 'c'
+	 && @items1 >1
+	 && @items2==1
+	 && (@items1-1)==(grep {/^[\d\,]+\tCARD$/} @items1[0..($#items1-1)])
+	 && $items1[$#items1] =~ /^[\d\,]+\.\tADJA$/
+	 && $items2[0] =~ /^[\d\,\_]+\.\t\[ORD\]$/
+	)
     {
-      #$hunk->[5] = 1;
-      $hunk->[5] = makefix(\@items1,\@items2,1);
-      $hunk->[6] = 'H:numSep';
+      $hunk->[5] = makefix(\@items1,\@items2, 2,'ADJA');
+      $hunk->[6] = 'H:ordGroup';
     }
-  ##-- CHANGE: Punctuation separation: $1 ~ (*[[:punct:]]*/*) & $2 ~ (...) -> $1 : DISABLED
-  elsif (0 && $op eq 'c'
-	 && @items1==1
-	 && $items1[0] =~ /^[^\t]*[[:punct:]]/)
-    {
-      #$hunk->[5] = 1;
-      $hunk->[5] = makefix(\@items1,\@items2,1);
-      $hunk->[6] = 'H:punctSep';
-    }
-  ##-- CHANGE: Punctuation grouping: $1 ~ (*/* */\'\w+) & $2 ~ (...) --> $1 : DISABLED
-  elsif (0 && $op eq 'c'
-	 && @items1==2
-	 && $items1[1] =~ /^\'\w+\t/
-	 && @items2==1)
-    {
-      #$hunk->[5] = 1;
-      $hunk->[5] = makefix(\@items1,\@items2,1);
-      $hunk->[6] = 'H:punctGroup';
-    }
-  ##-- CHANGE: annoying quote assimilation: $1 ~ (*/* ''/$() & 2 ~ (*'/- '/$() --> $1 [mantis bug #537]
+  ##-- CHANGE: quote assimilation: $1 ~ (*/* ''/$() & 2 ~ (*'/- '/$() --> $1 [mantis bug #537]
   elsif ($op eq 'c'
 	 && @items1==2
 	 && @items2==2
@@ -213,21 +177,111 @@ foreach $hunk (@$hunks) {
 	)
     {
       $hunk->[5] = makefix(\@items1,\@items2,1);
-      $hunk->[5][1] .= "\t>\$\."; ##-- add analysis for EOS punctuation
-      $hunk->[6] = "H:eosAbbr";
+      $hunk->[5][1] .= "\t>[\$\.]"; ##-- add analysis for EOS punctuation
+      $hunk->[6] = "H:abbrEOS";
     }
-  ##-- CHANGE: mis-recognized ORD at EOS
+  ##-- CHANGE: abbrNN : $1 ~ (*./NN) & $2 ~ (*/* ./$.) --> $1 + ">[XY] >[\$ABBREV]"
   elsif ($op eq 'c'
-	 && @items1==2
-	 && @items2==1
-	 #&& $items1[0] =~ /^[\d\,]+\tCARD$/
-	 && $items1[1] =~ /^\.\t\$\.$/
-	 && $items2[0] =~ /^[^\t]+\.\t\[ORD\]$/
+	 && @items1==1
+	 && @items2==2
+	 && $items1[0] =~ /\.\tNN$/
+	 && $items2[1] eq ".\t[\$.]"
 	)
     {
       $hunk->[5] = makefix(\@items1,\@items2,1);
-      $hunk->[5][1] .= "\t>\$\."; ##-- add analysis for EOS punctuation
-      $hunk->[6] = "H:ordAbbr";
+      $hunk->[5][0] .= "\t>[XY]\t>[\$ABBREV]";
+      $hunk->[6] = "H:abbrNN";
+    }
+  ##-- CHANGE: ordEOS: $1 ~ ((*/CARD)+ ./$.) & 2 ~ (*./ORD) --> (*/CARD ./$.) ##-- incorporates numGroup heuristics too
+  elsif ($op eq 'c'
+	 && @items1>=2
+	 && @items2==1
+	 && ((grep {/^[\d\_\,]+\tCARD$/} @items1[0..($#items1-1)])==(@items1-1))
+	 && $items1[$#items1] =~ /^\.\t\$\.$/
+	 && $items2[0] =~ /^[^\t]+\.\t\[ORD\]$/
+	)
+    {
+      (my $txt0 = $items2[0]) =~ s/\.\t.*$//;
+      $hunk->[5] = ["$txt0\t<CARD\t>[CARD]",".\t<\$.\t>\[\$\.]"];
+      $hunk->[6] = "H:ordEOS";
+    }
+  ##-- CHANGE: ordNoEOS: $1 ~ (*./ADJA) & $2 ~ (*/CARD ./$.) --> $1 + ">[ORD]"
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2==2
+	 && $items1[0] =~ /^[\d\,\_]+\.\tADJA$/
+	 && $items2[0] =~ /^[\d\,\_]+\t\[CARD\]$/
+	 && $items2[1] eq ".\t[\$.]"
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][0] .= "\t>[ORD]"; ##-- apend "tokenizer"-supplied analysis
+      $hunk->[6] = "H:ordNoEOS";
+    }
+  ##-- CHANGE: truncJoin: TRUNC truncation: $1 ~ (*-/*) & $2 ~ (*/* -/$() --> $1 + ">[TRUNC]"
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2==2
+	 && $items1[0] =~ /^[^\t]*\-\t/
+	 && $items2[1] =~ /^\-\t/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][0] .= "\t>[TRUNC]"; ##-- append "tokenizer"-supplied analysis
+      $hunk->[6] = "H:truncJoin";
+    }
+  ##-- CHANGE: aposNE : $1 ~ (d'Whosit/NE) & $2 ~ (d'/* Whosit/*) --> $2/NE
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2==2
+	 && ($items1[0] =~ /\tNE$/ || $items1[0] =~ /^[[:alpha:]]\'[[:upper:]][^\t]*\tADJA$/)
+	 && $items2[0] =~ /^[[:alpha:]]\'$/
+	 && $items2[1] !~ /\t/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,2,'NE');
+      $hunk->[6] = 'H:aposNE';
+    }
+  ##-- CHANGE: slash-compound: $1 ~ (*\/*/(NN|NE)) --> $1
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && $items1[0] =~ /^[^\t]*\/[^\t]*\tN[NE]/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[6] = 'H:slashCompound';
+    }
+  ##-- CHANGE: quotCompound: $1 ~ (*'*-*/(NN|NE)) --> $1
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && $items1[0] =~ /^[^\t\']*\'[^\t\']\-[^\t\']*\tN[NE]/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[6] = 'H:quotCompound';
+    }
+  ##-- CHANGE: numRange: $1 ~ (\d+-\d+/CARD) & $2 ~ (*/* (*/*)+) --> $1 + ">[CARD]"
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2 >1
+	 && $items1[0] =~ /^[0-9,]+-[0-9,]+\tCARD$/
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[5][0] .= "\t>[CARD]";
+      $hunk->[6] = 'H:numRange';
+    }
+  ##-- CHANGE: aposGen: $1 ~ (*'s?/(NN|NE)) & $2 ~ (* 's?) --> $1
+  elsif ($op eq 'c'
+	 && @items1==1
+	 && @items2==2
+	 && (($items1[0] =~ /^[^\t]*\'s\tN[NE]$/ && $items2[$#items2] eq "'s")
+	     ||
+	     ($items1[0] =~ /^[^\t]*\'\tN[NE]$/ && $items2[$#items2] eq "'\t[\$,]"))
+	)
+    {
+      $hunk->[5] = makefix(\@items1,\@items2,1);
+      $hunk->[6] = 'H:aposGen';
     }
   ##-- MISC: force pseudo-$1
   elsif ($fix_all) {

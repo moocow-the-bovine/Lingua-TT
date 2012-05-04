@@ -97,8 +97,8 @@ tt-diff.perl - diff of TT file(s) keyed by token text
    -shared , -noshared  ##-- do/don't output shared data lines (default=do)
    -files  , -nofiles   ##-- do/don't output filenames (default=do)
    -keep   , -nokeep    ##-- do/don't keep temp files (default=don't)
-   -eos    , -noeos     ##-- do/don't treat EOS as ordinary token (default=do)
-   -cmt    , -nocmt     ##-- do/don't treat comments as ordinary tokens (default=do)
+   -eos    , -noeos     ##-- do/don't treat EOS as ordinary tokens (default=don't)
+   -cmt    , -nocmt     ##-- do/don't treat comments as ordinary tokens (default=don't)
 
 =cut
 
