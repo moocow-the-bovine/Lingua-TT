@@ -93,19 +93,20 @@ sub fromString {
 sub rawString {
   my $sent = shift;  ##-- ( \@tok1, \@tok2, ..., \@tokN )
   my @spaces = qw(); ##-- ( $space_before_tok1, ..., $space_before_tokN )
+  my @words  = grep {$_->[0] !~ /^\%\%/} @$sent; ##-- remove comments
 
   ##-- insert boundary space
-  @spaces = map {''} @$sent;
+  @spaces = map {''} @words;
   my ($i,$t1,$t2);
-  foreach $i (1..$#$sent) {
-    ($t1,$t2) = @$sent[($i-1),$i];
+  foreach $i (1..$#words) {
+    ($t1,$t2) = @words[($i-1),$i];
     next if ($t2->[0] =~ /^(?:[\]\)\%\.\,\:\;\!\?]|\'+|\'[[:alpha:]]+)$/);	##-- no token-boundary space BEFORE these text types
     next if ($t1->[0] =~ /^(?:[\[\(]|\`+)$/);					##-- no token-boundary space AFTER  these text types
     $spaces[$i] = ' ';								##-- default: add token-boundary space
   }
 
   ##-- dump raw text
-  return join('', map {($spaces[$_],$sent->[$_][0])} (0..$#$sent));
+  return join('', map {($spaces[$_],$words[$_][0])} (0..$#words));
 }
 
 ##==============================================================================
