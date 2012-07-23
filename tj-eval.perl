@@ -27,6 +27,7 @@ our $doprint = 1;
 
 our $want_cmts = 0;
 our $want_eos  = 0;
+our $want_canonical = 0;
 
 our $jxs = JSON::XS->new->utf8(0)->allow_nonref(1);
 
@@ -42,6 +43,7 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'comments|cmts|c!' => \$want_cmts,
+	   'canonical|canon|C' => \$want_canonical,
 	   'eos|s!' => \$want_eos,
 	   'print|p!' => \$doprint,
 	  );
@@ -75,6 +77,8 @@ our $ttout = Lingua::TT::IO->new->toFile($outfile)
 our $outfh = $ttout->{fh};
 binmode($outfh,':utf8');
 select($outfh);
+
+$jxs->canonical(1) if ($want_canonical);
 
 ##-- pre compile eval sub
 ##  + vars:
@@ -145,6 +149,7 @@ tj-eval.perl - eval perl code for each line of .tj files
  Other Options:
    -eos  , -noeos     ##-- do/don't eval CODe for eos lines (default=don't)
    -cmts , -nocmts    ##-- do/don't eval CODE for comment lines (default=don't)
+   -canon, -nocanon   ##-- do/don't ensure "canonical" output (default=don't)
    -noprint           ##-- don't implicitly print line data
    -output OUTFILE    ##-- set output file
 
