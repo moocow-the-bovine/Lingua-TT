@@ -89,11 +89,15 @@ $jxs->canonical(1) if ($want_canonical);
 ##      $_    : current line (chomped)
 ##      $t    : current token text
 ##      $j    : current json object
+##      $d    : document attributes (read-only)
+##      $s    : sentence attributes (read-only)
 our ($infile,$ttin,$infh, $t,$j,$s,$d);
 $code_byline = shift;
 our $dofile_code = q(
 sub {
   while (defined($_=<$infh>)) {
+    if (m/^\%\%\$TJ:DOC=(.*)/)    { $d = $jxs->decode($1); }
+    elsif (m/^\%\%$TJ:SENT=(.*)/) { $s = $jxs->decode($1); }
     if ((!$want_cmts && m/^\%\%/) || (!$want_eos && m/^$/)) {
       print if ($doprint);
       next;
@@ -160,10 +164,11 @@ tj-eval.perl - eval perl code for each line of .tj files
    $infh   : input filehandle
    $outfh  : output filehandle (select()ed)
    $_      : current line (chomped)
-   #$d      : current document attributes (read-only)
-   #$s      : current sentence attributes
+   $d      : current document attributes (read-only)
+   $s      : current sentence attributes (read-only)
    $t      : current token text
    $j      : current json object
+   $j0     : current json string
 
 =cut
 
