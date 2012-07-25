@@ -96,8 +96,8 @@ $code_byline = shift;
 our $dofile_code = q(
 sub {
   while (defined($_=<$infh>)) {
-    if (m/^\%\%\$TJ:DOC=(.*)/)    { $d = $jxs->decode($1); }
-    elsif (m/^\%\%$TJ:SENT=(.*)/) { $s = $jxs->decode($1); }
+    if (m/^\%\%\\$TJ:DOC=(.*)/)    { $d = $jxs->decode($1); }
+    elsif (m/^\%\%\\$TJ:SENT=(.*)/) { $s = $jxs->decode($1); }
     if ((!$want_cmts && m/^\%\%/) || (!$want_eos && m/^$/)) {
       print if ($doprint);
       next;
