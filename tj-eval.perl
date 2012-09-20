@@ -31,6 +31,9 @@ our $want_canonical = 0;
 
 our $jxs = JSON::XS->new->utf8(0)->allow_nonref(1);
 
+our @eval_begin = qw();
+our @eval_end   = qw();
+
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
@@ -39,6 +42,11 @@ GetOptions(##-- general
 	  #'man|m'  => \$man,
 	  'version|V' => \$version,
 	  'verbose|v=i' => \$verbose,
+
+	   ##-- code
+	   'begin|B=s' => \@eval_begin,
+	   'end|E=s' => \@eval_end,
+	   'use|M=s' => sub {push(@eval_begin,"use $_[1];")},
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -95,6 +103,10 @@ our ($infile,$ttin,$infh, $t,$j,$s,$d);
 $code_byline = shift;
 our $dofile_code = q(
 sub {
+  ##-- BEGIN user initial code
+  ).(@eval_begin ? join(";\n",@eval_begin) : '').q(
+  ##-- END user initial code
+
   while (defined($_=<$infh>)) {
     if (m/^\%\%\\$TJ:DOC=(.*)/)    { $d = $jxs->decode($1); }
     elsif (m/^\%\%\\$TJ:SENT=(.*)/) { $s = $jxs->decode($1); }
@@ -110,6 +122,10 @@ sub {
     ##-- END user code
     ).($doprint ? 'print join("\t",grep {defined($_)} $t, (defined($j) ? $jxs->encode($j) : qw())), "\n";' : '').q(
   }
+
+  ##-- BEGIN user final code
+  ).(@eval_end ? join(";\n",@eval_end) : '').q(
+  ##-- END user final code
 });
 vmsg(3,"$prog: DEBUG: User code sub\n",
      map {"$prog: DEBUG: $_\n"} split(/\n/,$dofile_code));
@@ -151,6 +167,9 @@ tj-eval.perl - eval perl code for each line of .tj files
    -verbose LEVEL
 
  Other Options:
+   -begin CODE        ##-- eval CODE before processing each file
+   -end CODE          ##-- eval CODE after processing each file
+   -use MODULE	      ##-- alias for -begin="use MODULE;"
    -eos  , -noeos     ##-- do/don't eval CODe for eos lines (default=don't)
    -cmts , -nocmts    ##-- do/don't eval CODE for comment lines (default=don't)
    -canon, -nocanon   ##-- do/don't ensure "canonical" output (default=don't)

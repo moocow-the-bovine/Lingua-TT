@@ -27,6 +27,9 @@ our $doprint = 1;
 our $want_cmts = 0;
 our $want_eos  = 0;
 
+our @eval_begin = qw();
+our @eval_end   = qw();
+
 ##----------------------------------------------------------------------
 ## Command-line processing
 ##----------------------------------------------------------------------
@@ -35,6 +38,11 @@ GetOptions(##-- general
 	  #'man|m'  => \$man,
 	  'version|V' => \$version,
 	  'verbose|v=i' => \$verbose,
+
+	   ##-- code
+	   'begin|B=s' => \@eval_begin,
+	   'end|E=s' => \@eval_end,
+	   'use|M=s' => sub {push(@eval_begin,"use $_[1];")},
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -86,6 +94,10 @@ our ($infile,$ttin,$infh);
 $code_byline = shift;
 our $dofile_code = q(
 sub {
+  ##-- BEGIN user initial code
+  ).(@eval_begin ? join(";\n",@eval_begin) : '').q(
+  ##-- END user initial code
+
   while (defined($_=<$infh>)) {
     if ((!$want_cmts && m/^\%\%/) || (!$want_eos && m/^$/)) {
       print if ($doprint);
@@ -98,6 +110,10 @@ sub {
     ##-- END user code
     ).($doprint ? 'print join("\t",@_), "\n";' : '').q(
   }
+
+  ##-- BEGIN user final code
+  ).(@eval_end ? join(";\n",@eval_end) : '').q(
+  ##-- END user final code
 });
 vmsg(3,"$prog: DEBUG: User code sub\n",
      map {"$prog: DEBUG: $_\n"} split(/\n/,$dofile_code));
@@ -138,8 +154,11 @@ tt-eval.perl - eval perl code for each line of .tt files
    -verbose LEVEL
 
  Other Options:
-   -eos  , -noeos     ##-- do/don't eval CODe for eos lines (default=don't)
-   -cmts , -nocmts    ##-- do/don't eval CODE for comment lines (default=don't)
+   -begin CODE        ##-- eval CODE before processing each file
+   -end CODE          ##-- eval CODE after processing each file
+   -use MODULE	      ##-- alias for -begin="use MODULE;"
+   -eos  , -noeos     ##-- do/don't eval PERLCODE for eos lines (default=don't)
+   -cmts , -nocmts    ##-- do/don't eval PERLCODE for comment lines (default=don't)
    -encoding ENCODING ##-- set I/O encoding
    -output OUTFILE    ##-- set output file
    -noprint           ##-- don't implicitly print @_
