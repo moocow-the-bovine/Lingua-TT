@@ -76,7 +76,10 @@ sub makefix {
     return [
 	    map {
 	      ($text,$tag)=split(/\t/,$_);
-	      join("\t", "~$text", "<$tag", ($otag ? ">$otag" : qw()))
+	      join("\t",
+		   (defined($text) ? "~$text" : '~'),
+		   (defined($tag)  ? "<$tag"  : qw()),
+		   (defined($otag) ? ">$otag" : qw()))
 	    } @$items1
 	   ];
   }
@@ -84,7 +87,7 @@ sub makefix {
 	  map {
 	    ($text,@ans)=split(/\t/,$_);
 	    join("\t",
-		 "~$text",
+		 (defined($text) ? "~$text" : '~'),
 		 ($otag ? ("<$otag",map {">$_"} @ans) : ("~$ans[0]",map {">$_"} @ans[1..$#ans])))
 	  } @$items2
 	 ];
@@ -315,7 +318,7 @@ foreach $hunk (@$hunks) {
       $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[6] = 'H:aposGen';
     }
-  ##-- CHANGE: tigerEOS: $1 ~ (*/* ./$.) & 2 ~ (*./ORD) --> $1 + "<[$.]"
+  ##-- CHANGE: dotEOS: $1 ~ (*/* ./$.) & 2 ~ (*./ORD) --> $1 + "<[$.]"
   elsif ($op eq 'c'
 	 && @items1==2
 	 && @items2==1
@@ -325,7 +328,17 @@ foreach $hunk (@$hunks) {
     {
       $hunk->[5] = makefix(\@items1,\@items2,1);
       $hunk->[5][1] .= "\t>[\$.]"; ##-- append "tokenizer"-supplied analysis
-      $hunk->[6] = 'H:tigerEOS';
+      $hunk->[6] = 'H:dotEOS';
+    }
+  ##-- DELETE: eosDel : $1 ~ (EOS) --> $1
+  elsif ($op eq 'd' && @items1==1 && $items1[0] eq '')
+    {
+      @$hunk[5,6] = (makefix(\@items1,\@items2,1), 'H:eosDel');
+    }
+  ##-- INSERT: eosIns : $2 ~ (EOS) --> $1
+  elsif ($op eq 'a' && @items2==1 && $items2[0] eq '')
+    {
+      @$hunk[5,6] = (makefix(\@items1,\@items2,1), 'H:eosIns');
     }
   ##-- MISC: force pseudo-$1
   elsif ($fix_all) {
