@@ -109,7 +109,7 @@ sub guessRawString {
   my @words  = map {$_->[0]} @toks;
 
   foreach (@words) {
-    $_ =~ s/_/ /g if ($_ =~ /^[0-9]{1,3}(?:_[0-9]{3})+$/); ##-- map underscore to space in separated numerals
+    $_ =~ s/_/ /g if ($_ =~ /^[0-9]{1,3}(?:_[0-9]{3})+(?:,[0-9]+)?$/); ##-- map underscore to space in separated numerals
   }
 
   ##-- insert boundary space
