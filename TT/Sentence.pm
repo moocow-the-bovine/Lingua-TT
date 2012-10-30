@@ -105,20 +105,25 @@ sub rawString {
 sub guessRawString {
   my $sent = shift;  ##-- ( \@tok1, \@tok2, ..., \@tokN )
   my @spaces = qw(); ##-- ( $space_before_tok1, ..., $space_before_tokN )
-  my @words  = grep {$_->[0] !~ /^\%\%/} @$sent; ##-- remove comments
+  my @toks   = grep {$_->[0] !~ /^\%\%/} @$sent; ##-- remove comments
+  my @words  = map {$_->[0]} @toks;
+
+  foreach (@words) {
+    $_ =~ s/_/ /g if ($_ =~ /^[0-9]{1,3}(?:_[0-9]{3})+$/); ##-- map underscore to space in separated numerals
+  }
 
   ##-- insert boundary space
   @spaces = map {''} @words;
-  my ($i,$t1,$t2);
+  my ($i,$w1,$w2);
   foreach $i (1..$#words) {
-    ($t1,$t2) = @words[($i-1),$i];
-    next if ($t2->[0] =~ /^(?:[\]\)\%\.\,\:\;\!\?]|\'+|\'[[:alpha:]]+)$/);	##-- no token-boundary space BEFORE these text types
-    next if ($t1->[0] =~ /^(?:[\[\(]|\`+)$/);					##-- no token-boundary space AFTER  these text types
+    ($w1,$w2) = @words[($i-1),$i];
+    next if ($w2 =~ /^(?:[\]\)\%\.\,\:\;\!\?]|\'+|\'[[:alpha:]]+)$/);	##-- no token-boundary space BEFORE these text types
+    next if ($w1 =~ /^(?:[\[\(]|\`+)$/);					##-- no token-boundary space AFTER  these text types
     $spaces[$i] = ' ';								##-- default: add token-boundary space
   }
 
   ##-- dump raw text
-  return join('', map {($spaces[$_],$words[$_][0])} (0..$#words));
+  return join('', map {($spaces[$_],$words[$_])} (0..$#words));
 }
 
 ##==============================================================================
