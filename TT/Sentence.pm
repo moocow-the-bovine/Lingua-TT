@@ -90,7 +90,19 @@ sub fromString {
 ## Methods: Raw Text (heuristic)
 
 ## $str = $sent->rawString()
+##  + get raw text for sentence
+##  + returns TEXT from first comment-line '%% $stxt=TEXT' or '%% Sentence ID\t=TEXT' if available
+##  + otherwise, heuristically generates raw-text string from sentence tokens using $sent->guessRawString()
 sub rawString {
+  foreach (@{$_[0]}) {
+    return $1 if ($_->[0] =~ /^%% (?:\$stxt=|Sentence [^\t]*\t=)(.*)/);
+  }
+  return $_[0]->guessRawString();
+}
+
+## $str = $sent->guessdRawString()
+##  + guess raw text for sentence
+sub guessRawString {
   my $sent = shift;  ##-- ( \@tok1, \@tok2, ..., \@tokN )
   my @spaces = qw(); ##-- ( $space_before_tok1, ..., $space_before_tokN )
   my @words  = grep {$_->[0] !~ /^\%\%/} @$sent; ##-- remove comments

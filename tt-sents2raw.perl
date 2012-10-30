@@ -51,13 +51,14 @@ push(@ARGV,'-') if (!@ARGV);
 our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
     or die("$0: open failed for '$outfile': $!");
 
-foreach $infile (@ARGV) {
+my ($sraw);
+foreach my $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for '$infile': $!");
-  $doc = $ttin->getDocument->canonicalize;
+  $doc = $ttin->getDocument;
   $ttin->close();
 
-  $ttout->putLines([map {$_->rawString} @$doc]);
+  $ttout->putLines([grep {$_ !~ /^\s*$/} map {$_->rawString} @$doc]);
 }
 $ttout->close();
 
