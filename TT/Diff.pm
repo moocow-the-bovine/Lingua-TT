@@ -351,10 +351,17 @@ sub seqTempFile {
   confess(ref($diff)."::seqFile($which): sequence '$which' is not defined!")
     if (!$diff->{"seq${which}"});
 
-  ##-- get tempfile
-  my ($fh,$filename) = File::Temp::tempfile("ttdiff_XXXX", SUFFIX=>'.t0', UNLINK=>(!$diff->{keeptmp}) );
-  confess(ref($diff)."::seqFile($which): open failed for '$filename': $!") if (!defined($fh));
+  my ($fh,$filename);
+  if (!defined($filename=$diff->{"tmpfile${which}"})) {
+    ##-- get tempfile
+    ($fh,$filename) = File::Temp::tempfile("ttdiff_XXXX", SUFFIX=>'.t0', UNLINK=>(!$diff->{keeptmp}) );
+    confess(ref($diff)."::seqFile($which): open failed for '$filename': $!") if (!defined($fh));
+  } else {
+    $fh = IO::File->new(">$filename");
+    confess(ref($diff)."::seqFile($which): open failed for '$filename': $!") if (!defined($fh));
+  }
   binmode($fh,':utf8');
+  $diff->{"tmpfile${which}"} = $filename;
 
   ##-- dump
   my $keysub = $diff->{"key${which}"};
@@ -365,7 +372,7 @@ sub seqTempFile {
   }
   $fh->close();
 
-  return $diff->{"tmpfile${which}"} = $filename;
+  return $filename;
 }
 
 ##==============================================================================
