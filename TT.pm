@@ -11,6 +11,7 @@ use Lingua::TT::Sentence;
 use Lingua::TT::Document;
 use Lingua::TT::IO;
 use Lingua::TT::Dict;
+use Lingua::TT::TextAlignment;
 
 use strict;
 

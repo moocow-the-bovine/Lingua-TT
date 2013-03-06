@@ -35,8 +35,9 @@ our %fmtargs	  = (
 our %outfmts = (
 		'none' => 'null',
 		'diff' => 'ttdiff',
-		'tt' => 'ttc',
-		'DEFAULT' => 'ttdiff',
+		'tt' => 'rtt',
+		'ttc' => 'rtt',
+		'DEFAULT' => 'rtt',
 	       );
 
 ##----------------------------------------------------------------------
@@ -191,10 +192,10 @@ sub save_ttdiff {
 
 ##--------------------------------------------------------------
 ##-- output: tt +text-comments
-sub save_ttc {
+sub save_rtt {
   my ($diff,$filename) = @_;
   my $fh = IO::File->new(">$filename")
-    or die("$prog: save_ttc(): open failed for '$filename': $!");
+    or die("$prog: save_rtt(): open failed for '$filename': $!");
   binmode($fh, ":encoding($ioargs{encoding})") if ($ioargs{encoding});
 
   ##-- get ci-to-ti map
@@ -223,7 +224,7 @@ sub save_ttc {
       $fh->print($ttlines->[$ti], "\n");
     } else {
       ##-- character data present: snarfle it up (greedy)
-      $fh->print($ttlines->[$ti], "\t", @$cseq[$ci_min..($ci_max-1)], "\n");
+      $fh->print(@$cseq[$ci_min..($ci_max-1)], "\t", $ttlines->[$ti], "\n");
 
       ##-- update counters
       $ci = $ci_max;
@@ -243,7 +244,7 @@ sub save_ttc {
 sub save_xml {
   my ($diff,$filename) = @_;
   my $fh = IO::File->new(">$filename")
-    or die("$prog: save_ttc(): open failed for '$filename': $!");
+    or die("$prog: save_rtt(): open failed for '$filename': $!");
   binmode($fh, ":encoding($ioargs{encoding})") if ($ioargs{encoding});
 
   if ($::fmtargs{xmlroot}) {
@@ -421,12 +422,12 @@ tt-txt-align.perl - align raw-text and TT-format files
    -keep   , -nokeep    # do/don't keep temp files (default=don't)
    -minimal             # alias for -D='-d'
    -D DIFF_OPTIONS      # pass DIFF_OPTIONS to GNU diff
-   -F FMT_OPTION=VAL	# additional format-specific options
+   -F FMT_OPTION=VAL	# additional format-specific options (e.g. xmlc=ELT, xmlroot=ELT, ...)
 
  I/O Options:
    -output FILE         # output file (default: STDOUT)
    -encoding ENC        # input encoding (default: utf8) [output is always utf8]
-   -format FMT		# use output format FMT {ttdiff,ttc,xml,...} (default: ttdiff)
+   -format FMT		# use output format FMT {ttdiff,rtt,xml,...} (default: rtt)
 
 =cut
 

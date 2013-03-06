@@ -260,9 +260,7 @@ sub print {
 ##  + dumps @lines to output handle, adding terminating newline
 sub putLines {
   my $io = shift;
-  my $lines = @_==1 && ref($_[0]) ? $_[0] : [@_];
-  my $buf = join("\n",@$lines)."\n";
-  $io->{fh}->print($buf);
+  $io->{fh}->print(map {/\R\z/ ? $_ : "$_\n"} (ref($_[0]) ? @{$_[0]} : @_));
   return $io;
 }
 

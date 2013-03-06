@@ -131,7 +131,7 @@ sub toString {
 
 ## $doc = $doc->fromString($str)
 ##  + parses $doc from string $str
-BEGIN { *saveNativeString = \&toString; }
+BEGIN { *loadNativeString = \&fromString; }
 sub fromString {
   #my ($sent,$str) = @_;
   @{$_[0]} = map {Lingua::TT::Sentence->newFromString($_)} split(/(?:\r?\n){2}/,$_[1]);
