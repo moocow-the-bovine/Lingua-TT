@@ -3,6 +3,7 @@
 use lib '.';
 use Lingua::TT;
 use Lingua::TT::Diff;
+use Lingua::TT::TextAlignment;
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -23,22 +24,12 @@ our $verbose      = $vl_info;
 our $VERSION	  = 0.01;
 
 our $outfile      = '-';
-our $outfmt       = 'DEFAULT';
 our %ioargs       = (encoding=>'UTF-8');
 our %saveargs     = (shared=>1, context=>undef, syntax=>1);
 our %diffargs     = (auxEOS=>0, auxComments=>1, diffopts=>'');
-our %fmtargs	  = (
-		     'xmlc'    => 'c',    ##-- e.g. 'c', '' for none
-		     'xmlroot' => 'doc',  ##-- e.g. 'doc', '' for none
-		    );
 
-our %outfmts = (
-		'none' => 'null',
-		'diff' => 'ttdiff',
-		'tt' => 'rtt',
-		'ttc' => 'rtt',
-		'DEFAULT' => 'rtt',
-	       );
+our $dump_ttdiff = 0; ##-- dump/debug ttdiff?
+our $raw_ttdiff  = 0; ##-- dump raw ttdiff data?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -51,11 +42,11 @@ GetOptions(##-- general
 	   ##-- diff
 	   'keep|K!'  => \$diffargs{keeptmp},
 	   'diff-options|D' => \$diffargs{diffopts},
-	   'fmt-options|F=s'  => \%fmtargs,
 	   'minimal|d' => sub { $diffargs{diffopts} .= ' -d'; },
 
 	   ##-- I/O
-	   'format|f=s' => \$outfmt,
+	   'ttdiff' => \$dump_ttdiff,
+	   'raw-ttdiff' => sub {$dump_ttdiff=$raw_ttdiff=$_[1]},
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	  );
@@ -68,20 +59,11 @@ if ($version || $verbose >= 2) {
   exit 0 if ($version);
 }
 
-
 ##-- sanity check(s) & overrides
 if ($diffargs{keeptmp}) {
   $diffargs{tmpfile1} //= 'tmp_txt.t0';
   $diffargs{tmpfile2} //= 'tmp_tt.t0';
 }
-
-##-- check for known output format
-my $outfmt0 = $outfmt;
-my $outsub  = undef;
-$outfmt = 'DEFAULT' if (!defined($outfmt));
-$outfmt = $outfmts{$outfmt} while (defined($outfmts{$outfmt}));
-pod2usage({-exitval=>1,-verbose=>0,-msg=>"unknown output format '$outfmt0'"})
-  if ( !($outsub=UNIVERSAL::can('main',"save_$outfmt")) );
 
 ##----------------------------------------------------------------------
 ## messages
@@ -96,6 +78,13 @@ sub vmsg1 {
 
 ##----------------------------------------------------------------------
 ## Output
+
+##----------------------------------------------------------------------
+## utils: (un)-escaping
+BEGIN {
+  *escape_rtt = \&Lingua::TT::TextAlignment::escape_rtt;
+  *unescape_rtt = \&Lingua::TT::TextAlignment::unescape_rtt;
+}
 
 ##--------------------------------------------------------------
 ## utils: compute $char_i => $tt_i map
@@ -137,7 +126,7 @@ sub get_c2t_vec {
 }
 
 ##--------------------------------------------------------------
-## utils: compute $char_i => $tt_i map
+## utils: compute $tt_i => ($min_ci,$max_ci) maps
 
 ## (\$minr,\$maxr) = get_w_minmax(\$c2t);
 ##  + see get_c2t_vec() for details on arg \$c2t
@@ -165,16 +154,27 @@ sub get_w_minmax {
 }
 
 ##--------------------------------------------------------------
-## output: null
-sub save_null {
-  return 1;
+## utils: compute character-index => (offset,length) maps
+
+## \$coff = get_c_offsets(\@txtchars)
+sub get_c_offsets {
+  my $coff = '';
+  my ($i,$off,$len) = (1,0,0);
+  vec($coff,0,32) = 0;
+  foreach (@{$_[0]}) {
+    $off += bytes::length( unescape_rtt($_) );
+    vec($coff,$i,32) = $off;
+    ++$i;
+  }
+  return \$coff;
 }
+
 
 ##--------------------------------------------------------------
 ## output: tt-diff
 sub save_ttdiff {
   my ($diff,$filename) = @_;
-  if (!$fmtargs{rawdiff}) {
+  if (!$raw_ttdiff) {
     my $used = '';
     my ($tti);
     foreach (@{$diff->{seq2}}) {
@@ -186,162 +186,52 @@ sub save_ttdiff {
       }
     }
   }
-  $diff->saveTextFile($filename, %saveargs,%fmtargs)
-    or die("$prog: diff->saveTextFile() failed for '$filename': $!");
+  $diff->saveTextFile($outfile, %saveargs,%fmtargs)
+    or die("$prog: failed to save ttdiff dump to '$outfile': $!");
 }
 
 ##--------------------------------------------------------------
 ##-- output: tt +text-comments
 sub save_rtt {
   my ($diff,$filename) = @_;
-  my $fh = IO::File->new(">$filename")
-    or die("$prog: save_rtt(): open failed for '$filename': $!");
-  binmode($fh, ":encoding($ioargs{encoding})") if ($ioargs{encoding});
+  my $ta = Lingua::TT::TextAlignment->new();
+  $ta->{lines} = $::ttlines;
+  $ta->{buf}   = $::txtbuf;
+  my $offr     = \$ta->{off};
+  my $lenr     = \$ta->{len};
 
-  ##-- get ci-to-ti map
+  ##-- get ci-to-ti, min-, and max-character maps
   my $c2tr = get_c2t_vec($diff);
-
-  ##-- get min-,max-character-index for each tt-line index
   my ($wminr,$wmaxr) = get_w_minmax($c2tr);
+  my $coffr = get_c_offsets(\@txtchars);
+  my ($coff,$clen) = (0,0);
+  my ($ti);
 
-  ##-- churn through, tt-primary
-  my $cseq = $diff->{seq1};
-  my ($ti,$ci) = (0,0);
-  my ($ci_min,$ci_max);
-  foreach $ti (0..$#$ttlines) {
+  foreach $ti (0..$#$::ttlines) {
     ##-- get token limits
     $ci_min = vec($$wminr,$ti+1,32);
     $ci_max = vec($$wmaxr,$ti+1,32);
-
-    ##-- leading text data?
-    if ($ci < $ci_min) {
-      $fh->print("%%\$c=", @$cseq[$ci..($ci_min-1)], "\n");
-      $ci = $ci_min;
-    }
 
     if ($ci_min>=$ci_max) {
       ##-- no character data for this tt-line (comment or EOS): just dump the tt-line
-      $fh->print($ttlines->[$ti], "\n");
+      $clen = 0;
     } else {
-      ##-- character data present: snarfle it up (greedy)
-      $fh->print(@$cseq[$ci_min..($ci_max-1)], "\t", $ttlines->[$ti], "\n");
-
-      ##-- update counters
-      $ci = $ci_max;
-    }
-  }
-
-  ##-- trailing text data?
-  $fh->print("%%\$c=", @$cseq[$ci..$#$cseq], "\n") if ($ci <= $#{$cseq});
-
-  ##-- all done
-  close($fh);
-}
-
-
-##--------------------------------------------------------------
-## output: XML +c
-sub save_xml {
-  my ($diff,$filename) = @_;
-  my $fh = IO::File->new(">$filename")
-    or die("$prog: save_rtt(): open failed for '$filename': $!");
-  binmode($fh, ":encoding($ioargs{encoding})") if ($ioargs{encoding});
-
-  if ($::fmtargs{xmlroot}) {
-    $fh->print('<?xml version="1.0"', ($ioargs{encoding} ? " encoding=\"$ioargs{encoding}\"" : qw()), "?>\n",
-	       "<$::fmtargs{xmlroot}>\n"
-	      );
-  }
-
-  ##-- get ci-to-ti map
-  my $c2tr = get_c2t_vec($diff);
-
-  ##-- get min-,max-character-index for each tt-line index
-  my ($wminr,$wmaxr) = get_w_minmax($c2tr);
-
-  my %cxlate = (
-		"\\n" => "\n",
-		"\\t" => "\t",
-	       );
-
-  ##-- churn through, tt-primary
-  my $xmlc = $::fmtargs{xmlc};
-  my $endl = $xmlc ? "\n" : '';
-  my $cseq = $diff->{seq1};
-  my ($ti,$ci) = (0,0);
-  my ($ci_min,$ci_max);
-  my ($s_open,$cmt);
-  foreach $ti (0..$#$ttlines) {
-    ##-- get token limits
-    $ci_min = vec($$wminr,$ti+1,32);
-    $ci_max = vec($$wmaxr,$ti+1,32);
-
-    ##-- leading text data?
-    if ($ci < $ci_min) {
-      $fh->print(($xmlc ? "<$xmlc>" : qw()),
-		 xmlescape(join('',map {$cxlate{$_}//$_} @$cseq[$ci..($ci_min-1)])),
-		 ($xmlc ? "</$xmlc>" : qw()),
-		 $endl
-		);
-      $ci = $ci_min;
+      ##-- character data present: claim it greedily
+      $coff = vec($$coffr,$ci_min, 32);
+      $clen = vec($$coffr,$ci_max, 32) - $coff;
     }
 
-    if ($ci_min>=$ci_max) {
-      ##-- no character data for this tt-line (comment or EOS): just dump the item
-      if ($ttlines->[$ti] =~ /^%%(.*)$/) {
-	$cmt = $1;
-	$fh->print("<!--",
-		   ($cmt =~ /^ / ? qw() : ' '),
-		   xmlescape($cmt),
-		   ($cmt =~ / $/ ? qw() : ' '),
-		   "-->",
-		   $endl);
-      }
-      elsif ($ttlines->[$ti] =~ /^$/) {
-	$fh->print("</s>$endl") if ($s_open);
-	$s_open = 0;
-      }
-      else {
-	$fh->print("<w tt=\"", xmlescape($ttlines->[$ti]), "\"/>$endl");
-      }
-    } else {
-      ##-- character data present: snarfle it up (greedy)
-      $fh->print(
-		 ($s_open ? '' : "<s>$endl"),
-		 "<w tt=\"", xmlescape($ttlines->[$ti]),"\">", @$cseq[$ci_min..($ci_max-1)], "</w>$endl"
-		);
-      $s_open = 1;
-
-      ##-- update counters
-      $ci = $ci_max;
-    }
+    ##-- update TextAlignment object
+    vec($$offr, $ti, 32) = $coff;
+    vec($$lenr, $ti, 32) = $clen;
+    $coff += $clen;
   }
 
-  ##-- close final sentence
-  $fh->print($s_open ? "</s>$endl" : qw());
 
-  ##-- trailing text data?
-  $fh->print(($xmlc ? "<$xmlc>" : qw()),
-	     xmlescape(join('', map {$cxlate{$_}//$_} @$cseq[$ci..$#$cseq])),
-	     ($xmlc ? "</$xmlc>" : qw()),
-	     $endl);
-
-  ##-- close wrapper element?
-  $fh->print("</$::fmtargs{xmlroot}>\n") if ($::fmtargs{xmlroot});
-
-
-  ##-- all done
-  close($fh);
+  ##-- dump TextAlignment object as RTT
+  $ta->saveRttFile($outfile,%ioargs)
+    or die("$prog: failed to save RTT dump to '$outfile': $!");
 }
-
-##--
-my ($_esc);
-sub xmlescape {
-  $_esc=shift;
-  $_esc=~s/([\&\'\"\<\>\r\n\t])/'&#'.ord($1).';'/ge;
-  return $_esc;
-}
-
 
 
 ##----------------------------------------------------------------------
@@ -351,7 +241,7 @@ our ($txtfile,$ttfile) = @ARGV;
 
 ##-- get raw text buffer
 vmsg1($vl_info, "buffering text data from $txtfile ...");
-my ($txtbuf);
+our ($txtbuf);
 {
   local $/=undef;
   open(TXT,"<:encoding($ioargs{encoding})",$txtfile)
@@ -368,7 +258,7 @@ our $ttlines = $ttio->getLines();
 
 ##-- split to characters
 vmsg1($vl_info, "extracting text characters ...");
-our @txtchars = map {s/\R/\\n/g; s/\t/\\t/g; $_} split(//,$txtbuf);
+our @txtchars = map {escape_rtt($_)} split(//,$txtbuf);
 
 vmsg1($vl_info, "extracting token characters ...");
 my ($l,$w,$w0,@c);
@@ -392,9 +282,17 @@ $diff->compare(\@txtchars,\@ttchars)
   or die("$0: diff->compare() failed: $!");
 @$diff{qw(file1 file2)} = ("$txtfile (text)", "$ttfile (tokens)");
 
-##-- dump
-vmsg1($vl_info, "saving to $outfile using format '$outfmt'...");
-$outsub->($diff,$outfile);
+##-- dump ttdiff?
+if ($dump_ttdiff) {
+  vmsg1($vl_info, "dumping ".($raw_ttdiff ? 'raw ' : '')."ttdiff data to $outfile...");
+  save_ttdiff($diff,$outfile);
+}
+else {
+  ##-- convert to Lingua::TT::TextAlignment and dump RTT
+  vmsg1($vl_info, "dumping RTT data to $outfile...");
+  save_rtt($diff,$outfile);
+}
+
 vmsg1($vl_info, "done.\n");
 
 __END__
@@ -407,7 +305,7 @@ __END__
 
 =head1 NAME
 
-tt-txt-align.perl - align raw-text and TT-format files
+tt-txt-align.perl - align raw-text and TT-format files to RTT format
 
 =head1 SYNOPSIS
 
@@ -425,9 +323,10 @@ tt-txt-align.perl - align raw-text and TT-format files
    -F FMT_OPTION=VAL	# additional format-specific options (e.g. xmlc=ELT, xmlroot=ELT, ...)
 
  I/O Options:
-   -output FILE         # output file (default: STDOUT)
+   -output FILE         # output file in RTT format (default: STDOUT)
    -encoding ENC        # input encoding (default: utf8) [output is always utf8]
-   -format FMT		# use output format FMT {ttdiff,rtt,xml,...} (default: rtt)
+   -ttdiff		# dump ttdiff data (for debugging)
+   -raw-ttdiff		# dump ttdiff data (for low-level debugging)
 
 =cut
 
