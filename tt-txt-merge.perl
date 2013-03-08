@@ -66,20 +66,20 @@ our ($txtfile,$ttfile) = @ARGV;
 our $ta = Lingua::TT::TextAlignment->new();
 
 ##-- get raw text buffer
-vmsg1($vl_info, "loading text data from $txtfile ...");
+vmsg1($vl_trace, "loading text data from $txtfile ...");
 $ta->loadTextFile($txtfile,%ioargs)
   or die("$prog: failed to load text buffer from $txtfile: $!");
 
 ##-- get tt data with offsets
-vmsg1($vl_info, "loading TT+offset data from $ttfile ...");
+vmsg1($vl_trace, "loading TT+offset data from $ttfile ...");
 $ta->loadTTFile($ttfile,%ioargs)
   or die("$prog: failed to load TT data from $ttfile: $!");
 
 ##-- dump as Rtt
-vmsg1($vl_info, "saving to $outfile ...");
+vmsg1($vl_trace, "saving to $outfile ...");
 $ta->toRttFile($outfile,%ioargs)
   or die("$prog: save failed to $outfile: $!");
-vmsg1($vl_info, "done.\n");
+vmsg1($vl_trace, "done.\n");
 
 __END__
 

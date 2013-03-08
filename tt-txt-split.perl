@@ -67,24 +67,24 @@ our $rttfile = shift;
 our $ta = Lingua::TT::TextAlignment->new();
 
 ##-- load rtt
-vmsg1($vl_info, "loading RTT file from $rttfile ...");
+vmsg1($vl_trace, "loading RTT file from $rttfile ...");
 $ta->loadRttFile($rttfile,%ioargs)
   or die("$prog: load failed for $rttfile: $!");
 
 ##-- dump text
 if ($txtfile) {
-  vmsg1($vl_info, "dumping text buffer to $txtfile ...");
+  vmsg1($vl_trace, "dumping text buffer to $txtfile ...");
   $ta->saveTextFile($txtfile,%ioargs)
     or die("$prog: save text failed to $txtfile: $!");
 }
 
 if ($outfile) {
-  vmsg1($vl_info, "dumping TT data to $outfile ...");
+  vmsg1($vl_trace, "dumping TT data to $outfile ...");
   $ta->saveTTFile($outfile,%ioargs)
     or die("$prog: save TT failed to $outfile: $!");
 }
 
-vmsg1($vl_info, "done.\n");
+vmsg1($vl_trace, "done.\n");
 
 __END__
 

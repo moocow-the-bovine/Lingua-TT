@@ -20,7 +20,7 @@ our $vl_info = 3;
 our $vl_trace = 4;
 
 our $prog         = basename($0);
-our $verbose      = $vl_info;
+our $verbose      = $vl_trace;
 our $VERSION	  = 0.01;
 
 our $outfile      = '-';
@@ -186,7 +186,7 @@ sub save_ttdiff {
       }
     }
   }
-  $diff->saveTextFile($outfile, %saveargs,%fmtargs)
+  $diff->saveTextFile($outfile, %saveargs)
     or die("$prog: failed to save ttdiff dump to '$outfile': $!");
 }
 
@@ -240,7 +240,7 @@ sub save_rtt {
 our ($txtfile,$ttfile) = @ARGV;
 
 ##-- get raw text buffer
-vmsg1($vl_info, "buffering text data from $txtfile ...");
+vmsg1($vl_trace, "buffering text data from $txtfile ...");
 our ($txtbuf);
 {
   local $/=undef;
@@ -251,16 +251,16 @@ our ($txtbuf);
 }
 
 ##-- get raw tt data
-vmsg1($vl_info, "buffering TT data from $ttfile ...");
+vmsg1($vl_trace, "buffering TT data from $ttfile ...");
 my $ttio  = Lingua::TT::IO->fromFile($ttfile,%ioargs)
   or die("$0: could not open Lingua::TT::IO from $ttfile: $!");
 our $ttlines = $ttio->getLines();
 
 ##-- split to characters
-vmsg1($vl_info, "extracting text characters ...");
+vmsg1($vl_trace, "extracting text characters ...");
 our @txtchars = map {escape_rtt($_)} split(//,$txtbuf);
 
-vmsg1($vl_info, "extracting token characters ...");
+vmsg1($vl_trace, "extracting token characters ...");
 my ($l,$w,$w0,@c);
 our @ttchars  = (
 		 map {
@@ -276,7 +276,7 @@ our @ttchars  = (
 
 
 ##-- run tt-diff comparison
-vmsg1($vl_info, "comparing ...");
+vmsg1($vl_trace, "comparing ...");
 our $diff = Lingua::TT::Diff->new(%diffargs);
 $diff->compare(\@txtchars,\@ttchars)
   or die("$0: diff->compare() failed: $!");
@@ -284,16 +284,16 @@ $diff->compare(\@txtchars,\@ttchars)
 
 ##-- dump ttdiff?
 if ($dump_ttdiff) {
-  vmsg1($vl_info, "dumping ".($raw_ttdiff ? 'raw ' : '')."ttdiff data to $outfile...");
+  vmsg1($vl_trace, "dumping ".($raw_ttdiff ? 'raw ' : '')."ttdiff data to $outfile...");
   save_ttdiff($diff,$outfile);
 }
 else {
   ##-- convert to Lingua::TT::TextAlignment and dump RTT
-  vmsg1($vl_info, "dumping RTT data to $outfile...");
+  vmsg1($vl_trace, "dumping RTT data to $outfile...");
   save_rtt($diff,$outfile);
 }
 
-vmsg1($vl_info, "done.\n");
+vmsg1($vl_trace, "done.\n");
 
 __END__
 
