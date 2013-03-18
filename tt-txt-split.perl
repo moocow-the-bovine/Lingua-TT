@@ -43,7 +43,7 @@ GetOptions(##-- general
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 #pod2usage({-exitval=>0,-verbose=>0,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
-if ($version || $verbose >= 2) {
+if ($version || $verbose >= $vl_trace) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
   exit 0 if ($version);
 }
@@ -100,7 +100,7 @@ tt-txt-split.perl - split RTT-format raw-text from tokenized data
 
 =head1 SYNOPSIS
 
- tt-txt-merge.perl [OPTIONS] RTT_FILE
+ tt-txt-split.perl [OPTIONS] RTT_FILE
 
  General Options:
    -help

@@ -15,7 +15,7 @@ use File::Basename qw(basename);
 our $VERSION = "0.01";
 
 ##-- program vars
-our $progname     = basename($0);
+our $prog     = basename($0);
 our $verbose      = 1;
 
 our $outfile      = '-';
@@ -50,7 +50,7 @@ pod2usage({-exitval=>0,-verbose=>1}) if ($man);
 pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
 if ($version || $verbose >= 2) {
-  print STDERR "$progname version $VERSION by Bryan Jurish\n";
+  print STDERR "$prog version $VERSION by Bryan Jurish\n";
   exit 0 if ($version);
 }
 
@@ -60,9 +60,9 @@ if ($version || $verbose >= 2) {
 our ($file1,$file2) = @ARGV;
 our $diff = Lingua::TT::Diff->new(%diffargs);
 $diff->compare($file1,$file2, %ioargs)
-  or die("$0: diff->compare() failed: $!");
+  or die("$prog: diff->compare() failed: $!");
 $diff->saveTextFile($outfile, %saveargs)
-  or die("$0: diff->saveTextFile() failed for '$outfile': $!");
+  or die("$prog: diff->saveTextFile() failed for '$outfile': $!");
 
 
 __END__

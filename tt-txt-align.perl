@@ -54,7 +54,7 @@ GetOptions(##-- general
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>0,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
-if ($version || $verbose >= 2) {
+if ($version || $verbose >= $vl_trace) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
   exit 0 if ($version);
 }
@@ -320,7 +320,6 @@ tt-txt-align.perl - align raw-text and TT-format files to RTT format
    -keep   , -nokeep    # do/don't keep temp files (default=don't)
    -minimal             # alias for -D='-d'
    -D DIFF_OPTIONS      # pass DIFF_OPTIONS to GNU diff
-   -F FMT_OPTION=VAL	# additional format-specific options (e.g. xmlc=ELT, xmlroot=ELT, ...)
 
  I/O Options:
    -output FILE         # output file in RTT format (default: STDOUT)
