@@ -17,7 +17,7 @@ our $VERSION = "0.01";
 
 ##-- program vars
 our $progname     = basename($0);
-our $verbose      = 1;
+our $verbose      = $Lingua::TT::Diff::vl_error;
 
 our $outfile      = '-';
 our %diffargs     = qw();
@@ -41,7 +41,7 @@ pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
 #pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
-if ($version || $verbose >= 2) {
+if ($version || $verbose >= $Lingua::TT::Diff::vl_info) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
   exit 0 if ($version);
 }
@@ -57,7 +57,7 @@ sub pct {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-our $diff = Lingua::TT::Diff->new(%diffargs);
+our $diff = Lingua::TT::Diff->new(verbose=>$verbose,%diffargs);
 
 push(@ARGV,'-') if (!@ARGV);
 our $outfh = IO::File->new(">$outfile")
@@ -68,6 +68,7 @@ foreach $dfile (@ARGV) {
   $diff->reset;
   $diff->loadTextFile($dfile)
     or die("$0: load failed for '$dfile': $!");
+  $diff->vmsg1($Lingua::TT::Diff::vl_trace, "loaded $dfile");
 
   ##-- vars
   my ($file1,$file2,$seq1,$seq2,$hunks) = @$diff{qw(file1 file2 seq1 seq2 hunks)};

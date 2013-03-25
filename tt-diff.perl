@@ -16,7 +16,7 @@ our $VERSION = "0.01";
 
 ##-- program vars
 our $prog     = basename($0);
-our $verbose      = 1;
+our $verbose  = $Lingua::TT::Diff::vl_warn;
 
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
@@ -49,16 +49,22 @@ pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
 pod2usage({-exitval=>0,-verbose=>1,-msg=>'Not enough arguments specified!'}) if (@ARGV < 2);
 
-if ($version || $verbose >= 2) {
+if ($version || $verbose >= $Lingua::TT::Diff::vl_info) {
   print STDERR "$prog version $VERSION by Bryan Jurish\n";
   exit 0 if ($version);
+}
+
+##-- sanity check(s) & overrides
+if ($diffargs{keeptmp}) {
+  $diffargs{tmpfile1} //= 'ttdiff_tmp1.t';
+  $diffargs{tmpfile2} //= 'ttdiff_tmp2.t';
 }
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 our ($file1,$file2) = @ARGV;
-our $diff = Lingua::TT::Diff->new(%diffargs);
+our $diff = Lingua::TT::Diff->new(verbose=>$verbose, %diffargs);
 $diff->compare($file1,$file2, %ioargs)
   or die("$prog: diff->compare() failed: $!");
 $diff->saveTextFile($outfile, %saveargs)

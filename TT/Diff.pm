@@ -17,6 +17,15 @@ use strict;
 
 our $DIFF = 'diff'; ##-- search in path
 
+our $vl_silent = 0;
+our $vl_error = 1;
+our $vl_warn = 2;
+our $vl_info = 3;
+our $vl_debug = 4;
+our $vl_trace = 5;
+
+our $VERBOSE = $vl_warn;
+
 ##==============================================================================
 ## Constructors etc.
 
@@ -40,6 +49,7 @@ our $DIFF = 'diff'; ##-- search in path
 ##   ##
 ##   ##-- misc options
 ##   keeptmp => $bool,    ##-- if true, temp files will not be unlinked (default=false)
+##   verbose => $level,   ##-- verbosity level (default: $vl_warn)
 ##   ##
 ##   ##-- cache data
 ##   tmpfile1 => $tmp1,   ##-- filename: temporary key-file dump for $seq1
@@ -77,6 +87,7 @@ sub new {
 
 		    ##-- cache data
 		    keeptmp  => 0,
+		    verbose => $VERBOSE,
 		    tmpfile1 => undef,
 		    tmpfile2 => undef,
 
@@ -136,6 +147,21 @@ sub ksAll {
   return $_[1];
 }
 
+##==============================================================================
+## Methods: messages
+
+## undef = $CLASS_OR_OBJECT->vmsg($min_level, @message)
+sub vmsg {
+  my ($that,$level,@msg) = @_;
+  print STDERR @msg if ((ref($that) ? $that->{verbose} : $VERBOSE) >= $level);
+}
+
+## undef = $CLASS_OR_OBJECT->vmsg1($min_level, @message)
+sub vmsg1 {
+  $_[0]->vmsg($_[1], (ref($_[0])||$_[0]), ": ", @_[2..$#_], "\n");
+}
+
+
 
 ##==============================================================================
 ## Methods: Sequence Selection
@@ -168,6 +194,7 @@ sub seq2 {
 BEGIN { *isa = \&UNIVERSAL::isa; }
 sub setSequence {
   my ($diff,$i,$src,%opts) = @_;
+  $diff->vmsg1($vl_trace, "setSequence(i=$i, src=$src)");
   $i = $diff->checkWhich($i);
   my $rc = undef;
   if (isa($src,'Lingua::TT::Sentence')) {
@@ -201,18 +228,23 @@ sub setSequence {
 ##  + auto-computes $diff->{"aux${which}"} from $diff->{"seq${which}"}
 sub setAux {
   my ($diff,$which) = @_;
+  $diff->vmsg1($vl_trace, "setAux(which=$which)");
   $which = $diff->checkWhich($which);
 
   my $seq = $diff->{"seq${which}"};
   my $aux = $diff->{"aux${which}"};
+  my @oseq = qw();
   %$aux   = qw();
   my ($i,$j);
-  for ($i=0; $i<=$#$seq; $i++) {
+  for ($i=$j=0; $i<=$#$seq; ++$i,++$j) {
     if ( ($diff->{auxEOS} && $seq->[$i]=~/^$/) || ($diff->{auxComments} && $seq->[$i]=~/^\%\%/) ) {
-      push(@{$aux->{$i}}, splice(@$seq,$i,1));
-      --$i;
+      push(@{$aux->{$j}}, $seq->[$i]);
+      --$j;
+    } else {
+      push(@oseq, $seq->[$i]);
     }
   }
+  @$seq = @oseq;
 
   return $diff;
 }
@@ -292,6 +324,7 @@ sub sequenceFile {
 ##  + compare currently selected sequences, wrapping setSequence() calls if required
 sub compare {
   my ($diff,$src1,$src2,%opts) = @_;
+  $diff->vmsg1($vl_trace, "compare(src1=$src1, $src2=src2)");
 
   ##-- args: sequences
   $diff->seq1($src1,%opts) if (defined($src1));
@@ -306,6 +339,7 @@ sub compare {
   my $file2 = $diff->seqTempFile(2);
 
   ##-- compute & parse the diff (external call)
+  $diff->vmsg1($vl_trace, "compare(): SYSTEM $DIFF $diff->{diffopts} $file1 $file2");
   my $fh = IO::File->new("$DIFF $diff->{diffopts} $file1 $file2|")
     or die(ref($diff)."::compare(): could not open pipe from system diff '$DIFF': $!");
   binmode($fh,':utf8');
@@ -345,6 +379,7 @@ sub compare {
 ##  + creates temporary key-dump file $seq->{"tmpfile${which}"} for $diff->{"seq${which}"}
 sub seqTempFile {
   my ($diff,$which) = @_;
+  $diff->vmsg1($vl_trace, "seqTempFile(which=$which)");
 
   ##-- sanity check(s)
   $which = $diff->checkWhich($which);
@@ -479,6 +514,43 @@ sub bugline { my ($i,$i1,$i2,$seq1,$seq2) = @_; return sprintf("	  %3d  %d  %d  
 
 
 ##==============================================================================
+## Methods: Alignment extraction
+
+## \@alignment = $diff->alignment()
+## + returns an array-of-arrays of alignment items \@alignment = [ \@item1, \@item2, ... ]
+##   where each \@item = [ $i1, $i2, $hunk ]
+## + $hunk is undef for shared items
+## + $i1, $i2 are indices into $diff->{seq1} and $diff->{seq2} respectively
+sub alignment {
+  my $diff = shift;
+  my ($i1,$i2) = (0,0);
+  my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
+  my @align = qw();
+
+  my ($hunk, $op,$min1,$max1,$min2,$max2, $fix);
+  foreach $hunk (@$hunks) {
+    ($op,$min1,$max1,$min2,$max2,$fix) = @$hunk;
+
+    push(@align,
+	 ##-- shared preceding context
+	 (map {[$i1+$_, $i2+$_]} (0..($min1-$i1-1))),
+	 ##
+	 ##-- hunk content
+	 (map {[$_, undef, $hunk]} (($min1+0)..($max1+0))),
+	 (map {[undef, $_, $hunk]} (($min2+0)..($max2+0))),
+	);
+
+    ##-- update current position
+    ($i1,$i2) = ($max1+1,$max2+1);
+  }
+
+  ##-- shared trailing context
+  push(@align, map {[$i1+$_, $i2+$_]} (0..($min1-$i1-1)));
+
+  return \@align;
+}
+
+##==============================================================================
 ## Methods: I/O
 
 ##----------------------------------------------------------------------
@@ -527,8 +599,137 @@ sub singleString {
 ##  + %opts:
 ##     syntax => $bool, ##-- store syntax help? (default=1)
 ##     context => $n,   ##-- number of context lines (undef or <0 for full; default=-1)
+## $diff = $diff->saveTextFile($filename_or_fh,%opts)
+##  + stores text representation of $diff to $filename_or_fh
+##  + %opts:
+##     syntax => $bool, ##-- store syntax help? (default=1)
+##     context => $n,   ##-- number of context lines (undef or <0 for full; default=-1)
 sub saveTextFile {
   my ($diff,$file,%opts) = @_;
+  $diff->vmsg1($vl_trace, "saveTextFile(", ($opts{filename}||$file), ")");
+
+  my $fh = ref($file) ? $file : IO::File->new(">$file");
+  confess(ref($diff)."::saveTextFile(): open failed for '$file': $!") if (!defined($fh));
+  binmode($fh,':utf8');
+
+  ##-- options
+  my @optkeys = qw(header files shared context);
+  %opts = ((map {($_=>$diff->{$_})} @optkeys),syntax=>1,context=>-1,%opts);
+  my $k = defined($opts{context}) ? $opts{context} : -1;
+
+  ##-- dump: header
+  $fh->print("%% -*- Mode: Diff; encoding: utf-8 -*-\n",
+	     (("%" x 80), "\n"),
+	     "%% File auto-generated by ", ref($diff), "\n",
+	     "%% File Format:\n",
+	     "%%  \% COMMENT                           : comment\n",
+	     "%%  \$ NAME: VALUE                       : ".ref($diff)." object data field\n",
+	     "%%  \@ OP MIN1,MAX1 MIN2,MAX2 :FIX? CMT? : diff hunk address (0-based), fix = '0' (none), '\@' (user), '1' or '2' (file)\n",
+	     "%%  < LINE1                             : (\"deleted\")  line in file1 only\n",
+	     "%%  > LINE2                             : (\"inserted\") line in file2 only\n",
+	     "%%  ~ LINE_BOTH                         : (\"matched\")  with field prefixes)\n",
+	     "%%  = LINE_FIXED                        : (\"fixed\")    conflict resolution for FIX=\@\n",
+	     "%%  #< AUX1                             : (\"ignored1\") diff-irrelevant line from file1\n",
+	     "%%  #> AUX2                             : (\"ignored2\") diff-irrelevant line from file2\n",
+	     (("%" x 80), "\n"),
+	    ) if ($opts{syntax});
+
+  $fh->print("\$ file1: $diff->{file1}\n",
+	     "\$ file2: $diff->{file2}\n",
+	     "\$ context: $k\n",
+	     "\$ auxEOS: $diff->{auxEOS}\n",
+	     "\$ auxComments: $diff->{auxComments}\n",
+	    ) if (1);
+
+  ##-- get alignment
+  my $align = $diff->alignment;
+
+  ##-- dump: sequences + hunks
+  my ($i1,$i2) = (0,0);
+  my ($fmin1,$fmax1,$fmin2,$fmax2); ##-- finite-context vars
+  my ($seq1,$seq2,$hunks) = @$diff{qw(seq1 seq2 hunks)};
+  my ($hunk, $op,$min1,$max1,$min2,$max2,$fix,$cmt, $addr);
+
+  ##-- dump: full context
+  my ($ai,$aitem,$i1,$i2,$hunk);
+  if ($k < 0) {
+    foreach $ai (0..$#$align) {
+      ($i1,$i2,$hunk) = @{$aitem=$align->[$ai]};
+    }
+
+  foreach $hunk (@{$diff->{hunks}}) {
+    ($op,$min1,$max1,$min2,$max2,$fix,$cmt) = @$hunk;
+
+    if ($k < 0) {
+      ##-- full context
+
+      ##-- full context: dump preceding context
+      $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($min1-$i1-1)));
+
+      ##-- full context: dump hunk data
+      $addr  = "\@ $op $min1,$max1 $min2,$max2";
+      $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : ' :0');
+      $addr .= ' '.(defined($cmt) ? $cmt : '');
+      $fh->print($addr, "\n",
+		 (map {$diff->singleString(1, $_)} (($min1+0)..($max1+0))),
+		 (map {$diff->singleString(2, $_)} (($min2+0)..($max2+0))),
+		 (ref($fix) ? (map {"= $_\n"} @$fix) : qw()),
+		);
+
+      ##-- full context: update current position counters
+      ($i1,$i2) = ($max1+1,$max2+1);
+    }
+    else {
+      ##-- finite context: positions
+      $fmin1 = ($min1 >= $k ? ($min1-$k) : 0);
+      $fmin2 = ($min2 >= $k ? ($min2-$k) : 0);
+      $fmax1 = $max1+$k+1 <= $#$seq1 ? ($max1+$k+1) : $#$seq1;
+      $fmax2 = $max2+$k+1 <= $#$seq2 ? ($max2+$k+1) : $#$seq2;
+
+      ##-- finite context: hunk address
+      $addr  = "\@ $op ($fmin1 $fmin2) $min1,$max1 $min2,$max2";
+      $addr .= (defined($fix) ? (ref($fix) ? ' :@' : " :$fix") : ' :0');
+      $addr .= ' '.(defined($cmt) ? $cmt : '');
+
+      ##-- finite context: dump
+      $fh->print(
+		 ##-- leading separator
+		 "********\n",
+		 ##
+		 ##-- address
+		 $addr, "\n",
+		 ##
+		 ##-- leading context
+		 (map { $diff->sharedString($min1+$_, $min2+$_) } (-$k..-1)),
+		 ##
+		 ##-- hunk data
+		 (map {$diff->singleString(1, $_)} (($min1+0)..($max1+0))),
+		 (map {$diff->singleString(2, $_)} (($min2+0)..($max2+0))),
+		 (ref($fix) ? (map {"= $_\n"} @$fix) : qw()),
+		 ##
+		 ##-- trailing context
+		 (map { $diff->sharedString($max1+$_, $max2+$_) } (1..$k)),
+		);
+    }
+  }
+
+  ##-- dump trailing context (full dump only)
+  if ($k<0) {
+    $fh->print(map { $diff->sharedString($i1+$_, $i2+$_) } (0..($#$seq1-$i1)));
+  } else {
+    ##-- final trailing separator
+    $fh->print("********\n");
+  }
+
+  $fh->close() if (!ref($file));
+  return $diff;
+}
+
+##~~~~~~~~~~~~~~~~~~~~~
+sub saveTextFile0 {
+  my ($diff,$file,%opts) = @_;
+  $diff->vmsg1($vl_trace, "saveTextFile(", ($opts{filename}||$file), ")");
+
   my $fh = ref($file) ? $file : IO::File->new(">$file");
   confess(ref($diff)."::saveTextFile(): open failed for '$file': $!") if (!defined($fh));
   binmode($fh,':utf8');
@@ -640,6 +841,8 @@ sub saveTextFile {
 sub loadTextFile {
   my ($diff,$file,%opts) = @_;
   $diff = $diff->new if (!ref($diff));
+  $diff->vmsg1($vl_trace, "loadTextFile($file)");
+
   my $fh = ref($file) ? $file : IO::File->new("<$file");
   confess(ref($diff)."::loadTextFile(): open failed for '$file': $!") if (!defined($fh));
   binmode($fh,':utf8');
