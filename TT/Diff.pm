@@ -651,12 +651,7 @@ sub saveTextFile {
   my ($hunk, $op,$min1,$max1,$min2,$max2,$fix,$cmt, $addr);
 
   ##-- dump: full context
-  my ($ai,$aitem,$i1,$i2,$hunk);
-  if ($k < 0) {
-    foreach $ai (0..$#$align) {
-      ($i1,$i2,$hunk) = @{$aitem=$align->[$ai]};
-    }
-
+  my ($ai,$aitem);
   foreach $hunk (@{$diff->{hunks}}) {
     ($op,$min1,$max1,$min2,$max2,$fix,$cmt) = @$hunk;
 
