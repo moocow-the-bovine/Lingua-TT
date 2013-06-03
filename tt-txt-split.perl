@@ -36,7 +36,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'tt-output|tto|tt|o=s' => \$outfile,
-	   'text-output|text|txt|txo|t=s' => \$txtfile,
+	   'text-output|text|txt-output|txt|txo|t=s' => \$txtfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	  );
 
