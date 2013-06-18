@@ -53,7 +53,7 @@ GetOptions(##-- general
 	   'classify-true-positives|ctp|tp!' => \$classify{tp},
 	   'classify-false-positives|cfp|fp!' => \$classify{fp},
 	   'classify-false-negatives|cfn|fn!' => \$classify{fn},
-	   'classify-errors|ce|E!' => sub {$classify{fp}=$classify{fn}=$_[1]; $classify{tp}=!$_[1];},
+	   'classify-errors|errors|ce|E!' => sub {$classify{fp}=$classify{fn}=$_[1]; $classify{tp}=!$_[1];},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -166,8 +166,8 @@ sub get_eval_data {
     if ($line =~ /^$/) {
       ##-- sub-classify: sentence
       push(@classes, 's');
-      if    ($ii>0 && $seq[$srci][$ii-1] !~ m/^[[:punct:]]\t/)  { push(@classes, 's:nopunct'); }
-      elsif ($ii>0 && $seq[$srci][$ii-1] !~ m/^[\.\!\?\:]\t/)    { push(@classes, 's:nonstd'); }
+      if    ($ii>0 && $seq[$srci][$ii-1] !~ m/^[[:punct:]]+\t/) { push(@classes, 's:nopunct'); }
+      elsif ($ii>0 && $seq[$srci][$ii-1] !~ m/^[\.\!\?\:]\t/)   { push(@classes, 's:nonstd'); }
       if    ($ii>0 && $seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
     }
     else {

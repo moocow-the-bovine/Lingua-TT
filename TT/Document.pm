@@ -180,24 +180,39 @@ sub shuffle {
   return $doc;
 }
 
-##  @docs = $doc->splitN($n)  ##-- array context
-## \@docs = $doc->splitN($n)  ##-- scalar context
+##  @docs = $doc->splitN($n,%opts)  ##-- array context
+## \@docs = $doc->splitN($n,%opts)  ##-- scalar context
 ##  + splits $doc deterministically into $n roughly equally-sized @docs
 ##  + sentence data is shared (refs) between $doc and @docs
 ##  + for a random split, call $doc->shuffle(seed=>$seed)->splitN($n)
+##  + %opts:
+##     contiguous => $bool,	##-- if true, output @docs will represent contiguous sections of input (alias: 'contig')
 sub splitN {
   my ($doc,$n,%opts) = @_;
   my @odocs  = map {$doc->new} (1..$n);
   my @osizes = map {0} @odocs;
-  my ($sent,$oi,$oi_min);
-  foreach $sent (@$doc) {
-    ##-- find smallest @odoc
-    $oi_min = 0;
-    foreach $oi (1..$#odocs) {
-      $oi_min = $oi if ($osizes[$oi] < $osizes[$oi_min]);
+  if ($opts{contiguous} || $opts{contig}) {
+    ##-- contiguous mode
+    my $oi = 0;
+    my $osize = $doc->nTokens / ($n || 1);
+    my ($sent);
+    foreach $sent (@$doc) {
+      push(@{$odocs[$oi]}, $sent);
+      $osizes[$oi] += scalar(@$sent);
+      ++$oi if ($osizes[$oi] >= $osize);
     }
-    push(@{$odocs[$oi_min]}, $sent);
-    $osizes[$oi_min] += scalar(@$sent);
+  } else {
+    ##-- best-split mode
+    my ($sent,$oi,$oi_min);
+    foreach $sent (@$doc) {
+      ##-- find smallest @odoc
+      $oi_min = 0;
+      foreach $oi (1..$#odocs) {
+	$oi_min = $oi if ($osizes[$oi] < $osizes[$oi_min]);
+      }
+      push(@{$odocs[$oi_min]}, $sent);
+      $osizes[$oi_min] += scalar(@$sent);
+    }
   }
   return wantarray ? @odocs : \@odocs;
 }

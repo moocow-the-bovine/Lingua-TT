@@ -20,6 +20,7 @@ our $verbose      = 1;
 our $nsplits      = 2;
 our $outfmt       = 'split.%d';
 our $seed         = undef;
+our $shuffle	  = 1;
 
 our %ioargs = (encoding=>'UTF-8');
 
@@ -35,6 +36,7 @@ GetOptions(##-- general
 	   ##-- Selection
 	   'n-splits|ns|n=i' => \$nsplits,
 	   'seed|srand|s|r=i' => \$seed,
+	   'shuffle|shuf|S|randomize|random|rand|R!' => \$shuffle,
 
 	   ##-- I/O
 	   'output-format|outfmt|output|o=s' => \$outfmt,
@@ -89,8 +91,8 @@ print STDERR
   );
 
 ##-- shuffle & split
-$doc->shuffle(seed=>$seed);
-our @odocs = $doc->splitN($nsplits);
+$doc->shuffle(seed=>$seed) if ($shuffle);
+our @odocs = $doc->splitN($nsplits,contiguous=>!$shuffle);
 
 ##-- output
 $outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.\d*)?d/);
@@ -140,13 +142,14 @@ tt-split-n.perl - split up .t, .tt, and .ttt files into equally sized chunks
    -version
    -verbose LEVEL
 
- Selection Options
-   -n       NSPLITS        ##-- number of output files
-   -srand   SEED           ##-- default: none (perl default)
+ Selection Options:
+   -n       NSPLITS        # number of output files
+   -srand   SEED           # default: none (perl default)
+   -shuffle , -noshuffle   # do/don't shuffle before splitting (default=do)
 
  I/O Options:
-   -outfmt   OUTFMT        ##-- %d will be replaced by split index
-   -encoding ENCODING      ##-- set I/O encoding (default=UTF-8)
+   -outfmt   OUTFMT        # %d will be replaced by split index
+   -encoding ENCODING      # set I/O encoding (default=UTF-8)
 
 =cut
 
