@@ -545,7 +545,7 @@ sub alignment {
   }
 
   ##-- shared trailing context
-  push(@align, map {[$i1+$_, $i2+$_]} (0..($min1-$i1-1)));
+  push(@align, map {[$i1+$_, $i2+$_]} (0..($#$seq1-$i1-1)));
 
   return \@align;
 }
