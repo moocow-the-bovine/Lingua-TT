@@ -179,7 +179,7 @@ sub get_eval_data {
       elsif ($line =~ m/^[[:punct:]]+\t/) { push(@classes, 'w~punct'); }
       elsif ($line =~ m/^[[:alpha:][:punct:]]+\t/) { push(@classes, 'w~alpha+punct'); }
       elsif ($line =~ m/^[[:digit:][:punct:]]+\t/) { push(@classes, 'w~digit+punct'); }
-      elsif ($line =~ m/^[[:digit:][:punct:]_ ]+\t/) { push(@classes, 'w~digit+punct+space'); }
+      elsif ($line =~ m/^[[:digit:][:punct:]_ ]+\t/) { push(@classes, 'w~digit+punct+sp'); }
       else { push(@classes, 'w~zother'); }
 
       push(@classes, 'w:dotted')  if ($line =~ m/^[^\t]*[^[:punct:]\t][^\t]*\.\t/);

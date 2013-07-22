@@ -111,7 +111,6 @@ tt-txt-split.perl - split RTT-format raw-text from tokenized data
    -tt-output FILE      # TT-output file (default: STDOUT)
    -txt-output FILE     # text-output file (default: STDOUT)
    -encoding ENC        # I/O encoding (default: utf8)
-   -format FMT		# use output format FMT {ttdiff,ttc,xml,...} (default: ttdiff)
 
 =cut
 
