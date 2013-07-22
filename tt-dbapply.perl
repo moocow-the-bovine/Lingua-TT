@@ -44,7 +44,7 @@ GetOptions(##-- general
 	   'include-empty-analyses|allow-empty|empty!' => \$include_empty,
 	   'output|o=s' => \$outfile,
 	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
-p	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
+	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
