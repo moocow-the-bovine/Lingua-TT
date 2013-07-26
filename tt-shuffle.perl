@@ -82,7 +82,7 @@ $doc->shuffle(seed=>$seed);
 ##-- output
 $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
   or die("$0: open failed for output file '$outfile': $!");
-$ttout->putDocument($outfile);
+$ttout->putDocument($doc);
 $ttout->close();
 
 __END__
