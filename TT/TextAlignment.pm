@@ -53,6 +53,8 @@ sub clear {
 ## $str_escaped = escape_rtt($str)
 sub escape_rtt {
   my $s = shift;
+  $s =~ s/\\/\\\\/g;
+  $s =~ s/\f/\\f/g;
   $s =~ s/\t/\\t/g;
   $s =~ s/\r/\\r/g;
   $s =~ s/\n/\\n/g;
@@ -62,6 +64,8 @@ sub escape_rtt {
 ## $str_escaped = unescape_rtt($str)
 sub unescape_rtt {
   my $s = shift;
+  $s =~ s/\\\\/\\/g;
+  $s =~ s/\\f/\f/g;
   $s =~ s/\\t/\t/g;
   $s =~ s/\\r/\r/g;
   $s =~ s/\\n/\n/g;
