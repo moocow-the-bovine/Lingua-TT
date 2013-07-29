@@ -269,7 +269,7 @@ our @ttchars  = (
 		   ($w0 = $w) =~ s/\t.*$//;
 		   if ($w =~ /^\%\%/) { @c = ($w); }
 		   elsif ($w =~ /^$/) { @c = ("%%\$EOS"); }
-		   else { @c = map {"$_\t".($l+1)} split(//,$w0); }
+		   else { @c = map {escape_rtt($_)."\t".($l+1)} split(//,$w0); }
 		   @c
 		 } (0..$#$ttlines)
 		);
