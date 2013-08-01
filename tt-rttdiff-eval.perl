@@ -145,6 +145,9 @@ sub get_eval_data {
 
   my %events = (s=>{}, w=>{});
 
+  my $sid='-';
+  open(DEBUG, '>rt-tp.out');
+
   ##-- convert alignment-items to events
   my $nil = [];
   my @seq = @$diff{qw(seq1 seq2)};
@@ -166,8 +169,11 @@ sub get_eval_data {
     if ($line =~ /^$/) {
       ##-- sub-classify: sentence
       push(@classes, 's');
-      if    ($ii>0 && $seq[$srci][$ii-1] !~ m/^[[:punct:]]+\t/) { push(@classes, 's:nopunct'); }
+      if    ($ii>0 && $seq[$srci][$ii-1] !~ m/[[:punct:]]\t/)   { push(@classes, 's:nopunct'); }
+      elsif ($ii>0 && $seq[$srci][$ii-1] =~ m/^[\.\!\?\:]\t/)   { push(@classes, 's:std'); }
       elsif ($ii>0 && $seq[$srci][$ii-1] !~ m/^[\.\!\?\:]\t/)   { push(@classes, 's:nonstd'); }
+      if    ($ii>0 && $seq[$srci][$ii-1] =~ m/\.\t/)		{ push(@classes, "s:dot"); }
+      if    ($ii>0 && $seq[$srci][$ii-1] =~ m/.\.\t/)		{ push(@classes, "s:wdot"); }
       if    ($ii>0 && $seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
     }
     else {
@@ -191,6 +197,10 @@ sub get_eval_data {
     ++$events{$_}{$ekey} foreach (@classes);
     push(@{$aux[$srci]{$ii}}, "%%\@eval=$ekey ".join(' ',@classes)) if ($classify{$ekey});
     #$seq[$srci][$ii] .= "\t\@eval=$ekey ".join(' ',@classes) if ($classify{$ekey});
+
+    ##-- DEBUG
+    foreach (@{defined($i1) ? ($aux[0]{$i1}||$nil) : $nil}) { $sid = $1 if (/^%% Sentence (.*)$/); }
+    print DEBUG "$sid\n" if ($ekey eq 'tp' && grep {$_ eq 's~.'} @classes);
   }
 
   ##-- compute pr,rc,F
