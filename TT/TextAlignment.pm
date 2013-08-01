@@ -16,7 +16,7 @@ use strict;
 our @ISA = qw(Lingua::TT::Persistent Exporter);
 
 our @EXPORT = qw();
-our @EXPORT_TAGS = (
+our %EXPORT_TAGS = (
 		    escape=>[qw(escape_rtt unescape_rtt)],
 		   );
 $EXPORT_TAGS{all} = [map {@$_} values %EXPORT_TAGS];
