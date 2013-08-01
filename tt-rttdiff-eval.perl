@@ -145,8 +145,7 @@ sub get_eval_data {
 
   my %events = (s=>{}, w=>{});
 
-  my $sid='-';
-  open(DEBUG, '>rt-tp.out');
+  #my $sid='-'; open(DEBUG, '>rt-tp.out'); ##-- DEBUG
 
   ##-- convert alignment-items to events
   my $nil = [];
@@ -169,12 +168,14 @@ sub get_eval_data {
     if ($line =~ /^$/) {
       ##-- sub-classify: sentence
       push(@classes, 's');
-      if    ($ii>0 && $seq[$srci][$ii-1] !~ m/[[:punct:]]\t/)   { push(@classes, 's:nopunct'); }
-      elsif ($ii>0 && $seq[$srci][$ii-1] =~ m/^[\.\!\?\:]\t/)   { push(@classes, 's:std'); }
-      elsif ($ii>0 && $seq[$srci][$ii-1] !~ m/^[\.\!\?\:]\t/)   { push(@classes, 's:nonstd'); }
-      if    ($ii>0 && $seq[$srci][$ii-1] =~ m/\.\t/)		{ push(@classes, "s:dot"); }
-      if    ($ii>0 && $seq[$srci][$ii-1] =~ m/.\.\t/)		{ push(@classes, "s:wdot"); }
-      if    ($ii>0 && $seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
+      if ($ii>0) {
+	if    ($seq[$srci][$ii-1] =~ m/^[\.\!\?\:]\t/)		{ push(@classes, 's:std'); }
+	elsif ($seq[$srci][$ii-1] !~ m/^[^\t]*[[:punct:]]\t/)	{ push(@classes, 's:nopunct'); }
+	else							{ push(@classes, 's:nonstd'); }
+	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*\.\t/)		{ push(@classes, "s:dot"); }
+	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*[^[:punct:]][^\t]*\.\t/)		   { push(@classes, "s:abbr"); }
+	if    ($seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
+      }
     }
     else {
       ##-- sub-classify: word
@@ -199,8 +200,8 @@ sub get_eval_data {
     #$seq[$srci][$ii] .= "\t\@eval=$ekey ".join(' ',@classes) if ($classify{$ekey});
 
     ##-- DEBUG
-    foreach (@{defined($i1) ? ($aux[0]{$i1}||$nil) : $nil}) { $sid = $1 if (/^%% Sentence (.*)$/); }
-    print DEBUG "$sid\n" if ($ekey eq 'tp' && grep {$_ eq 's~.'} @classes);
+    #foreach (@{defined($i1) ? ($aux[0]{$i1}||$nil) : $nil}) { $sid = $1 if (/^%% Sentence (.*)$/); }
+    #print DEBUG "$sid\n" if ($ekey eq 'tp' && grep {$_ eq 's:dot'} @classes);
   }
 
   ##-- compute pr,rc,F
