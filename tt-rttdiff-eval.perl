@@ -232,7 +232,8 @@ sub get_eval_data {
   }
   $events{"s:ks"}{ncand} = $n_ks_cand;
   $events{"s:ks"}{ndots} = $n_dots;
-  $events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_dots; ##-- Kiss+Strunk "error rate"
+  $events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_ks_cand; ##-- Kiss+Strunk "error rate" (not-so-generous)
+  #$events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_dots; ##-- Kiss+Strunk "error rate" (generous)
 
   return \%events;
 }
