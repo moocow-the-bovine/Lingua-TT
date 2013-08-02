@@ -204,8 +204,11 @@ sub get_eval_data {
       ##-- kiss-strunk error rate stuff
       if ($srci==1) {
 	($text = $line) =~ s/\t.*$//;
-	$n_dots   += scalar @{[ $text =~ /[\.\?\!]/g ]};
-	if ($text =~ /[\.\?\!]$/) {
+	$n_dots   += scalar @{[ $text =~ /[\.]/g ]};
+	if (
+	    #$text =~ /[\.\?\!]$/ ##-- generous(?) eos-condition; ~ Kiss&Strunk(2006) Sec. 6.2 [1.40% on WSJ]
+	    $text =~ /[\.]$/ ##-- not-so generous(?) eos-condition; ~ Kiss&Strunk(2006) footnote 8 [1.25% on WSJ]
+	   ) {
 	  $is_dotted = 1;
 	  ++$n_ks_cand;
 	} elsif ($is_dotted && $text =~ /^[\"\'\`”\)\]\}\.]+/) {
@@ -232,8 +235,8 @@ sub get_eval_data {
   }
   $events{"s:ks"}{ncand} = $n_ks_cand;
   $events{"s:ks"}{ndots} = $n_dots;
-  $events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_ks_cand; ##-- Kiss+Strunk "error rate" (not-so-generous)
-  #$events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_dots; ##-- Kiss+Strunk "error rate" (generous)
+  $events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_ks_cand; ##-- Kiss&Strunk(2006) "error rate" (not-so-generous)
+  #$events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_dots; ##-- Kiss&Strunk(2006) "error rate" (generous)
 
   return \%events;
 }
