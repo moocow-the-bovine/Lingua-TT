@@ -88,9 +88,11 @@ sub n2prf {
   my $pr = ($nretr==0 ? 'nan' : ($ntp/$nretr));
   my $rc = ($nrel ==0 ? 'nan' : ($ntp/$nrel));
   my $F  = ($pr+$rc==0) ? 'nan' : (2 * $pr * $rc / ($pr + $rc));
+  my $Err = ($ntp+$nfp+$nfn==0 ? 'nan' : ($nfp+$nfn) / ($ntp+$nfp+$nfn));
   return (
 	  "tp"=>"$ntp", "fp"=>"$nfp", "fn"=>"$nfn", "ret"=>"$nretr", "rel"=>"$nrel",
 	  "pr"=>"$pr",  "rc"=>"$rc","F"=>"$F",
+	  "Err"=>"$Err",
 	 );
 }
 
@@ -124,12 +126,12 @@ sub dumptab {
   my $ffmt   = "%${flen}.2f";
   return
     (
-     sprintf("%s %-${plen}s  ".join('  ',map {"%${dlen}s"} qw(tp fp fn)).'  '.join('  ',map {"%${flen}s %%"} qw(pr rc F))."\n",
-	     $lprefix, map {uc($_)} 'label', qw(tp fp fn), qw(pr rc F)),
+     sprintf("%s %-${plen}s  ".join('  ',map {"%${dlen}s"} qw(tp fp fn)).'  '.join('  ',map {"%${flen}s %%"} qw(pr rc F Err))."\n",
+	     $lprefix, map {uc($_)} 'label', qw(tp fp fn), qw(pr rc F Err)),
      (map {
        my $prf = $_;
-       sprintf("%s %-${plen}s  ".join('  ',map {"%${dlen}d"} qw(tp fp fn)).'  '.join('  ',map {"$ffmt %%"} qw(pr rc F))."\n",
-	       $lprefix, $_, @{$ev->{$prf}}{qw(tp fp fn)}, (map {100.0*$ev->{$prf}{$_}} qw(pr rc F)))
+       sprintf("%s %-${plen}s  ".join('  ',map {"%${dlen}d"} qw(tp fp fn)).'  '.join('  ',map {"$ffmt %%"} qw(pr rc F Err))."\n",
+	       $lprefix, $_, @{$ev->{$prf}}{qw(tp fp fn)}, (map {100.0*$ev->{$prf}{$_}} qw(pr rc F Err)))
      } @prefixes),
     );
 }
@@ -145,7 +147,11 @@ sub get_eval_data {
 
   my %events = (s=>{}, w=>{});
 
-  #my $sid='-'; open(DEBUG, '>rt-tp.out'); ##-- DEBUG
+  ##-- variables for kiss-trunk error-rate (class "s:ks")
+  my $text      = '';
+  my $is_dotted = 0;
+  my $n_dots    = 0;
+  my $n_ks_cand = 0;
 
   ##-- convert alignment-items to events
   my $nil = [];
@@ -169,11 +175,13 @@ sub get_eval_data {
       ##-- sub-classify: sentence
       push(@classes, 's');
       if ($ii>0) {
+	push(@classes, 's:ks') if ($is_dotted);
+
 	if    ($seq[$srci][$ii-1] =~ m/^[\.\!\?\:]\t/)		{ push(@classes, 's:std'); }
 	elsif ($seq[$srci][$ii-1] !~ m/^[^\t]*[[:punct:]]\t/)	{ push(@classes, 's:nopunct'); }
 	else							{ push(@classes, 's:nonstd'); }
 	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*\.\t/)		{ push(@classes, "s:dot"); }
-	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*[^[:punct:]][^\t]*\.\t/)		   { push(@classes, "s:abbr"); }
+	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*[^[:punct:]\t][^\t]*\.\t/)	   { push(@classes, "s:abbr"); }
 	if    ($seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
       }
     }
@@ -192,6 +200,20 @@ sub get_eval_data {
       push(@classes, 'w:dotted')  if ($line =~ m/^[^\t]*[^[:punct:]\t][^\t]*\.\t/);
       push(@classes, 'w:nospace') if ($ii>0 && !grep {m/^%%\$c=\s+$/} @{$aux[$srci]{$ii}||$nil});
       push(@classes, 'w:apos')    if ($line =~ m/\'/);
+
+      ##-- kiss-strunk error rate stuff
+      if ($srci==1) {
+	($text = $line) =~ s/\t.*$//;
+	$n_dots   += scalar @{[ $text =~ /[\.\?\!]/g ]};
+	if ($text =~ /[\.\?\!]$/) {
+	  $is_dotted = 1;
+	  ++$n_ks_cand;
+	} elsif ($is_dotted && $text =~ /^[\"\'\`”\)\]\}\.]+/) {
+	  $is_dotted = 1;
+	} else {
+	  $is_dotted = 0;
+	}
+      }
     }
 
     ##-- count this item
@@ -208,6 +230,9 @@ sub get_eval_data {
   foreach (values %events) {
     %$_ = (%$_, n2prf(@$_{qw(tp fp fn)}));
   }
+  $events{"s:ks"}{ncand} = $n_ks_cand;
+  $events{"s:ks"}{ndots} = $n_dots;
+  $events{"s:ks"}{Err}   = ($events{"s:ks"}{fp}+$events{"s:ks"}{fn}) / $n_dots; ##-- Kiss+Strunk "error rate"
 
   return \%events;
 }
