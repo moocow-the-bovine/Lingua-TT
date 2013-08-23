@@ -36,7 +36,11 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'tt-output|tto|tt|o=s' => \$outfile,
+	   'no-tt-output|no-tto|no-tt|nott-output|notto|nott' => sub { undef $outfile },
+	   ##
 	   'text-output|text|txt-output|txt|txo|t=s' => \$txtfile,
+	   'no-text-output|no-text|no-txt-output|no-txt|no-txo|no-t|notext-output|notext|notxt-output|notxt|notxo|not' => sub { undef $txtfile },
+	   ##
 	   'encoding|e=s' => \$ioargs{encoding},
 	  );
 
@@ -109,7 +113,9 @@ tt-txt-split.perl - split RTT-format raw-text from tokenized data
 
  I/O Options:
    -tt-output FILE      # TT-output file (default: STDOUT)
-   -txt-output FILE     # text-output file (default: STDOUT)
+   -txt-output FILE     # text-output file (default: none)
+   -no-tt		# suppress TT-output
+   -no-txt		# suppress text-output
    -encoding ENC        # I/O encoding (default: utf8)
 
 =cut
