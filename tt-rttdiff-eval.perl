@@ -183,6 +183,8 @@ sub get_eval_data {
 	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*\.\t/)		{ push(@classes, "s:dot"); }
 	if    ($seq[$srci][$ii-1] =~ m/^[^\t]*[^[:punct:]\t][^\t]*\.\t/)	   { push(@classes, "s:abbr"); }
 	if    ($seq[$srci][$ii-1] =~ m/^([\.\!\?\:\;\/\)\]\}\-]|(?:[\'\"\`]+))\t/) { push(@classes, "s~$1"); }
+
+	if    ($ii<$#{$seq[$srci]} && $seq[$srci][$ii+1] !~ m/^[[:upper:]]/)	   { push(@classes, "s:nocaps"); }
       }
     }
     else {
