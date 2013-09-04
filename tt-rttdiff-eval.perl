@@ -202,6 +202,7 @@ sub get_eval_data {
       push(@classes, 'w:dotted')  if ($line =~ m/^[^\t]*[^[:punct:]\t][^\t]*\.\t/);
       push(@classes, 'w:nospace') if ($ii>0 && !grep {m/^%%\$c=\s+$/} @{$aux[$srci]{$ii}||$nil});
       push(@classes, 'w:apos')    if ($line =~ m/\'/);
+      push(@classes, 'w:nolex')   if ($line =~ m/\t.*\(NOLEX\)/);
 
       ##-- kiss-strunk error rate stuff
       if ($srci==1) {
