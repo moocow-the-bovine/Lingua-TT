@@ -41,7 +41,7 @@ GetOptions(##-- general
 	   'output|o=s'   => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'compact|compress|C|z!' => \$compact,
-	   'uncompact|uncompress|u|expand|x!' => sub {$compact=!$_[1]},
+	   'uncompact|uncompress|u|expand|x|prolix|P!' => sub {$compact=!$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -83,11 +83,11 @@ __END__
 
 =head1 NAME
 
-tt-rtt-compact.perl - convert between compact and prolix RTT dialects
+tt-rtt-convert.perl - convert between compact and prolix RTT dialects
 
 =head1 SYNOPSIS
 
- tt-rtt-compact.perl [OPTIONS] [RTT_FILE=-]
+ tt-rtt-convert.perl [OPTIONS] [RTT_FILE=-]
 
  General Options:
    -help
@@ -97,7 +97,7 @@ tt-rtt-compact.perl - convert between compact and prolix RTT dialects
  I/O Options:
    -output FILE         # output file in RTT format (default: STDOUT)
    -encoding ENC        # input encoding (default: utf8) [output is always utf8]
-   -compact  , -expand  # compact-mode (rtt->rttz) or expand-mode (rttz->rtt)?
+   -compact  , -expand  # compact or prolix-mode output?
 
 =cut
 
