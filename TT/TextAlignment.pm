@@ -94,32 +94,67 @@ sub toRttFile {
   my $lenr = \$ta->{len};
   my $buf_is_utf8 = utf8::is_utf8($$bufr);
   my ($pos,$i) = (0,0);
-  my ($l,$off,$len,$t0);
+  my ($l,$off,$len,$t0, $t,$rest);
+  my $ctxt = '';
+  my $compact = $opts{compact};
+  my $wrote_rtt_header = 0;
   foreach (@{$ta->{lines}}) {
     $off = vec($$offr,$i,32);
     $len = vec($$lenr,$i,32);
-    if (/^%%/ || /^$/) {
+
+    ##-- check for raw-text prefix
+    if ($pos < $off) {
+      $ctxt .= escape_rtt(bytes::substr($$bufr,$pos,$off-$pos));
+      utf8::decode($ctxt) if ($buf_is_utf8);
+      if ($ctxt ne '' && (!$compact || $ctxt !~ /^\s+$/)) {
+	$fh->print("%%\$c=$ctxt\n");
+	$ctxt = '';
+      }
+    }
+
+    if (/^%%\$RTT:/) {
+      ##-- RTT processing instruction: skip it
+      next;
+    }
+    elsif (/^%%/ || /^$/) {
+      ##-- eos or comment
       $l = $_;
     } else {
-      $t0 = escape_rtt( bytes::substr($$bufr,$off,$len) );
+      ##-- normal word
+      $t0 = bytes::substr($$bufr,$off,$len);
       utf8::decode($t0) if ($buf_is_utf8);
-      $l  = "$t0\t$_";
+
+      if ($compact) {
+	##-- compact mode: check for normalized text identity (on DECODED text)
+	($t,$rest) = split(/\t/,$_,2);
+	if ($t eq $t0) {
+	  $t0 = escape_rtt($t0);
+	} else {
+	  $t0 = escape_rtt("$t0 \$= $t");
+	}
+	$l = "$ctxt$t0".(defined($rest) ? "\t$rest" : '');
+	$ctxt = '';
+      } else {
+	##-- prolix mode
+	$l = escape_rtt($t0)."\t".$_;
+      }
+
+      ##-- ensure header before first word
+      if (!$wrote_rtt_header) {
+	$fh->print("%%\$RTT:COMPACT=", ($compact ? 1 : 0), "\n");
+	$wrote_rtt_header = 1;
+      }
     }
+
     $l .= "\n" if ($l !~ /\R\z/);
-  } continue {
-    if ($pos < $off) {
-      $t0 = escape_rtt(bytes::substr($$bufr,$pos,$off-$pos));
-      utf8::decode($t0) if ($buf_is_utf8);
-      $fh->print("%%\$c=$t0\n");
-    }
     $fh->print($l);
     ++$i;
     $pos = $off + $len;
   }
   if ($pos < bytes::length($$bufr)) {
-    $t0 = escape_rtt(bytes::substr($$bufr,$pos,bytes::length($$bufr)-$pos));
-    utf8::decode($t0) if ($buf_is_utf8);
-    $fh->print("%%\$c=$t0\n") if ($t0 ne '');
+    $ctxt = escape_rtt(bytes::substr($$bufr,$pos,bytes::length($$bufr)-$pos));
+    utf8::decode($ctxt) if ($buf_is_utf8);
+    $fh->print("%%\$c=$ctxt\n") if ($ctxt ne '');
   }
   $ttio->close();
 }
@@ -142,9 +177,15 @@ sub fromRttFile {
   my $lines = $ta->{lines};
   my ($pos,$i) = (0,0);
   my ($raw,$rest);
+  my $compact = $opts{compact};
+  my ($ctxt,$t,$rt);
   while (defined($_=<$fh>)) {
     chomp;
-    if (/^%%\$c=(.*)$/) {
+    if (/^%%\$RTT:COMPACT=(.*)$/) {
+      $compact = $1;
+      next;
+    }
+    elsif (/^%%\$c=(.*)$/) {
       $raw    = unescape_rtt($1);
       $$bufr .= $raw;
       $pos   += bytes::length($raw);
@@ -158,6 +199,22 @@ sub fromRttFile {
     else {
       ($raw,$rest) = split(/\t/,$_,2);
       $raw = unescape_rtt($raw);
+
+      if ($compact) {
+	##-- compact mode: decode word-text and prepend it to $rest
+	if ($raw =~ s/^(\s+)//) {
+	  $ctxt   = $1;
+	  $$bufr .= $ctxt;
+	  $pos   += bytes::length($ctxt);
+	}
+	if (($rt=$raw) =~ /^(.*) \$= (.*)$/) {
+	  ($raw,$t) = ($1,$2);
+	} else {
+	  $t = $raw;
+	}
+	$rest = $t . (defined($rest) ? "\t$rest" : '');
+      }
+
       vec($$offr, $i, 32) = $pos;
       vec($$lenr, $i, 32) = bytes::length($raw);
       $$bufr .= $raw;
