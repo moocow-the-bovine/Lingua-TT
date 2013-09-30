@@ -39,7 +39,7 @@ GetOptions(##-- general
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
-pod2usage({-exitval=>0,-verbose=>0,-msg=>'No tag-translation dictionary specified!'}) if (!@ARGV);
+#pod2usage({-exitval=>0,-verbose=>0,-msg=>'Not enough arguments!'}) if (!@ARGV);
 
 if ($version || $verbose >= 2) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
@@ -49,25 +49,17 @@ if ($version || $verbose >= 2) {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-push(@ARGV,'-') if (@ARGV < 2);
+push(@ARGV,'-') if (!@ARGV);
 our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
     or die("$0: open failed for '$outfile': $!");
 my $outfh = $ttout->{fh};
-
-##-- read dict
-my $dictfile = shift(@ARGV);
-my $dclass = 'Lingua::TT::Dict';
-my $dict = $dclass->loadFile($dictfile,%ioargs)
-  or die("$0: ${dclass}::loadFile() failed for dict file '$dictfile': $!");
-my $tagx = $dict->{dict};
-
 
 ##-- ye olde loope
 foreach my $infile (@ARGV) {
   my $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for '$infile': $!");
   my $infh = $ttin->{fh};
-  my (@f,@x,$xtag);
+  my ($prefix,$analyses,%seen);
 
   while (defined($_=<$infh>)) {
     if (/^%%/ || /^\s*$/) {
@@ -76,15 +68,17 @@ foreach my $infile (@ARGV) {
     }
     chomp;
     @f = split(/\t/,$_);
-    foreach (@f[${from_field}..$#f]) {
-      if (/\[_?([^\s\]]+)[\s\]]/ && defined($xtag=$tagx->{$1})) {
-	substr($_, $-[1], $+[1] - $-[1]) = $xtag;
-      }
-      elsif (defined($xtag=$tagx->{$_})) {
-	$_ = $xtag;
-      }
+    if ($#f >= $from_field) {
+      %seen  = qw();
+      print $outfh join("\t",
+			 @f[0..($from_field-1)],
+			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
+			map {(/\[_?([^\]\s]+)[\]\s]/ ? [$1,$_] : [$_,$_])}
+			@f[$from_field..$#f]
+		       ), "\n";
+    } else {
+      print $outfh $_, "\n";
     }
-    print $outfh join("\t",@f), "\n";
   }
   undef $infh;
   $ttin->close;
@@ -101,11 +95,11 @@ __END__
 
 =head1 NAME
 
-tt-tag-xlate.perl - apply tag-translation dictionary to a TT-file
+tt-tag-uniq.perl - reduce TT analyses to unique tags
 
 =head1 SYNOPSIS
 
- tt-tag-xlate.perl OPTIONS TAG_DICT [TT_FILE(s)]
+ tt-tag-uniq.perl [OPTIONS] [TT_FILE(s)]
 
  General Options:
    -help
@@ -115,7 +109,7 @@ tt-tag-xlate.perl - apply tag-translation dictionary to a TT-file
  Other Options:
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
-   -from=INDEX		##-- minimum index for translated fields (default=1)
+   -from=INDEX		##-- minimum index for reducible fields (default=1)
 
 =cut
 
