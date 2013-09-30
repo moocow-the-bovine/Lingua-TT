@@ -104,7 +104,7 @@ tt-diff-select.perl - select certain hunks of a tt-diff
 
 =head1 SYNOPSIS
 
- tt-diff-apply.perl OPTIONS [TT_DIFF_FILE]
+ tt-diff-select.perl OPTIONS [TT_DIFF_FILE]
 
  General Options:
    -help
