@@ -24,7 +24,7 @@ our $verbose      = $vl_trace;
 our $VERSION	  = 0.01;
 
 our $outfile      = '-';
-our %ioargs       = (encoding=>'UTF-8', rtt_compact=>0);
+our %ioargs       = (encoding=>'UTF-8', compact=>0);
 our %saveargs     = (shared=>1, context=>undef, syntax=>1);
 our %diffargs     = (auxEOS=>0, auxComments=>1, diffopts=>'');
 
@@ -49,8 +49,8 @@ GetOptions(##-- general
 	   'raw-ttdiff' => sub {$dump_ttdiff=$raw_ttdiff=$_[1]},
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
-	   'compact|C!' => \$ioargs{rtt_compact},
-	   'prolix|P!'  => sub {$ioargs{rtt_compact}=!$_[1]},
+	   'compact|C!' => \$ioargs{compact},
+	   'prolix|P|expanded|x!'  => sub {$ioargs{compact}=!$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -326,7 +326,7 @@ tt-txt-align.perl - align raw-text and TT-format files to RTT format
  I/O Options:
    -output FILE         # output file in RTT format (default: STDOUT)
    -encoding ENC        # input encoding (default: utf8) [output is always utf8]
-   -compact  , -prolix  # output unclaimed whitespace as raw text prefix (-compact) or '%%$c=' comments (-prolix, default)
+   -compact  , -prolix  # output compact rtt (-compact) or expanded (-prolix, default)
    -ttdiff		# dump ttdiff data (for debugging)
    -raw-ttdiff		# dump ttdiff data (for low-level debugging)
 

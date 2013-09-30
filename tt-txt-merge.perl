@@ -37,6 +37,8 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
+	   'compact|C!' => \$ioargs{compact},
+	   'prolix|P|expanded|x!'  => sub {$ioargs{compact}=!$_[1]},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -77,7 +79,7 @@ $ta->loadTTFile($ttfile,%ioargs)
 
 ##-- dump as Rtt
 vmsg1($vl_trace, "saving to $outfile ...");
-$ta->toRttFile($outfile,%ioargs)
+$ta->saveRttFile($outfile,%ioargs)
   or die("$prog: save failed to $outfile: $!");
 vmsg1($vl_trace, "done.\n");
 
@@ -105,6 +107,7 @@ tt-txt-merge.perl - merge raw-text and tokenizer output-files to RTT format
  I/O Options:
    -output FILE         # output file, RTT format (default: STDOUT)
    -encoding ENC        # I/O encoding (default: utf8)
+   -compact  , -prolix  # output compact RTT (-compact) or expanded (-prolix, default)
 
 =cut
 
