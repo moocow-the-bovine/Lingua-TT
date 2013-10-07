@@ -24,7 +24,7 @@ our $VERSION	  = 0.01;
 
 our $outfile      = '-';
 our $txtfile	  = undef;
-our %ioargs       = (encoding=>'UTF-8');
+our %ioargs       = (encoding=>'UTF-8', sentence_text=>0);
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -37,6 +37,7 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'tt-output|tto|tt|o=s' => \$outfile,
 	   'no-tt-output|no-tto|no-tt|nott-output|notto|nott' => sub { undef $outfile },
+	   'tt-sentence-text|sentence-text|sentences|stxt|s!' => \$ioargs{sentence_text},
 	   ##
 	   'text-output|text|txt-output|txt|txo|t=s' => \$txtfile,
 	   'no-text-output|no-text|no-txt-output|no-txt|no-txo|no-t|notext-output|notext|notxt-output|notxt|notxo|not' => sub { undef $txtfile },

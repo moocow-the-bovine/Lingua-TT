@@ -95,7 +95,7 @@ sub fromString {
 ##  + otherwise, heuristically generates raw-text string from sentence tokens using $sent->guessRawString()
 sub rawString {
   foreach (@{$_[0]}) {
-    return $1 if ($_->[0] =~ /^%% (?:\$stxt=|Sentence [^\t]*\t=)(.*)/);
+    return $1 if ($_->[0] =~ /^%%(?:\s*\$stxt=| Sentence\b[^\t]*\t=)(.*)/);
   }
   return $_[0]->guessRawString();
 }
