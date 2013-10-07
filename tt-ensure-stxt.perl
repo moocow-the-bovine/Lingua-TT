@@ -3,6 +3,7 @@
 use lib '.';
 use Lingua::TT;
 use Lingua::TT::TextAlignment ':escape';
+use Encode qw(encode decode);
 
 use Getopt::Long qw(:config no_ignore_case);
 use Pod::Usage;
@@ -55,7 +56,8 @@ if ($version || $verbose >= 2) {
 ##--------------------------------------------------------------
 sub tt_ensure_stxt_txtbuf {
   my ($ttin,$ttout,$txtbuf) = @_;
-  my ($s,$stxt_cmt,@sw, $off0,$len0, $off1,$len1);
+  my ($s,$stxt_cmt,@sw, $off0,$len0, $off1,$len1, $stxt);
+  my $enc = $ioargs{encoding};
 
   while (defined($s=$ttin->getSentence)) {
 
@@ -89,7 +91,9 @@ sub tt_ensure_stxt_txtbuf {
     ($off1,$len1) = split(' ', $sw[$#sw][1]);
 
     ##-- (re-)populate sentence-text comment
-    $stxt_cmt->[$#$stxt_cmt] .= escape_rtt( bytes::substr($txtbuf, $off0, $off1+$len1) );
+    $stxt = bytes::substr($txtbuf, $off0, ($off1+$len1)-$off0);
+    $stxt = decode($enc, $stxt) if ($enc);
+    $stxt_cmt->[$#$stxt_cmt] .= escape_rtt( $stxt );
   }
   continue {
     $ttout->putSentence($s);
