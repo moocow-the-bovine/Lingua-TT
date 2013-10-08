@@ -21,6 +21,7 @@ our $verbose      = 1;
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our $from_field   = 1;
+our $tags_only	  = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -35,6 +36,7 @@ GetOptions(##-- general
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'from-field|ff|from|f=i' => \$from_field,
+	   'trim|tags-only|t' => \$tags_only,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -54,6 +56,8 @@ our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
     or die("$0: open failed for '$outfile': $!");
 my $outfh = $ttout->{fh};
 
+my $dump_field = $tags_only ? 0 : 1;
+
 ##-- ye olde loope
 foreach my $infile (@ARGV) {
   my $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
@@ -72,7 +76,7 @@ foreach my $infile (@ARGV) {
       %seen  = qw();
       print $outfh join("\t",
 			 @f[0..($from_field-1)],
-			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
+			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[$dump_field])}
 			map {(/\[_?([^\]\s]+)[\]\s]/ ? [$1,$_] : [$_,$_])}
 			@f[$from_field..$#f]
 		       ), "\n";
@@ -110,6 +114,7 @@ tt-tag-uniq.perl - reduce TT analyses to unique tags
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for reducible fields (default=1)
+   -trim , -notrim	##-- do/don't dump only tags (default: -notrim)
 
 =cut
 
