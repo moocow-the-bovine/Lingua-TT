@@ -56,14 +56,12 @@ our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
     or die("$0: open failed for '$outfile': $!");
 my $outfh = $ttout->{fh};
 
-my $dump_field = $tags_only ? 0 : 1;
-
 ##-- ye olde loope
 foreach my $infile (@ARGV) {
   my $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for '$infile': $!");
   my $infh = $ttin->{fh};
-  my ($prefix,$analyses,%seen);
+  my ($prefix,$analyses,%seen,$tag);
 
   while (defined($_=<$infh>)) {
     if (/^%%/ || /^\s*$/) {
@@ -76,8 +74,8 @@ foreach my $infile (@ARGV) {
       %seen  = qw();
       print $outfh join("\t",
 			 @f[0..($from_field-1)],
-			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[$dump_field])}
-			map {(/\[_?([^\]\s]+)[\]\s]/ ? [$1,$_] : [$_,$_])}
+			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
+			map {$tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_; [$tag, $tags_only ? "[$tag]" : $_]}
 			@f[$from_field..$#f]
 		       ), "\n";
     } else {
@@ -114,7 +112,7 @@ tt-tag-uniq.perl - reduce TT analyses to unique tags
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for reducible fields (default=1)
-   -trim , -notrim	##-- do/don't dump only tags (default: -notrim)
+   -trim , -notrim	##-- do/don't dump only tags as "[TAG]" (default: -notrim)
 
 =cut
 
