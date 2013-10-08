@@ -22,8 +22,9 @@ our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our $from_field   = 1;
 
-our $replace	  = 0;  ##-- replace tags in-place?
-our $prepend	  = '$X='; ##-- prepend literal string to translated tags?
+our $replace	  = 0;       ##-- replace tags in-place?
+our $prepend	  = '$X=';   ##-- prepend literal string to translated tags?
+our $trim	  = '^\$.='; ##-- regex to trim from translated tags
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -40,6 +41,7 @@ GetOptions(##-- general
 	   'from-field|ff|from|f=i' => \$from_field,
 	   'replace|repl|r|in-place|inplace|i!' => \$replace,
 	   'prepend|p=s' => \$prepend,
+	   'trim|t=s' => \$trim,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -84,9 +86,11 @@ foreach my $infile (@ARGV) {
     foreach (@f[${from_field}..$#f]) {
       if (/\[_?([^\s\]]+)[\s\]]/ && defined($xtag=$tagx->{$1})) {
 	substr($_, $-[1], $+[1] - $-[1]) = ($replace ? $xtag : "$xtag ~$1");
+	s/$trim//o if (defined($trim));
 	$_ = $prepend . $_;
       }
       elsif (defined($xtag=$tagx->{$_})) {
+	s/$trim//o if (defined($trim));
 	$_ = $prepend . ($replace ? $xtag : "$xtag %%~$_");
       }
     }
@@ -122,8 +126,9 @@ tt-tag-xlate.perl - apply tag-translation dictionary to a TT-file
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for translated fields (default=1)
-   -replace , -norepl   ##-- do/don't replace tags in-place (default: -replace)
-   -prepend=PREFIX	##-- prepend PREFIX to translated tags (default: none)
+   -replace , -norepl   ##-- do/don't replace tags in-place (default: don't)
+   -prepend=PREFIX	##-- prepend PREFIX to translated tags (default: '$X=')
+   -trim=REGEX		##-- trim REGEX from translated tags (default: '^\$.=')
 
 =cut
 
