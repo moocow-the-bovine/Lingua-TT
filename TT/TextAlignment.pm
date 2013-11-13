@@ -207,10 +207,10 @@ sub fromRttFile {
 	  $$bufr .= $ctxt;
 	  $pos   += bytes::length($ctxt);
 	}
-	if (($rt=$raw) =~ /^(.*) \$= (.*)$/) {
-	  ($raw,$t) = ($1,$2);
+	if (($rt=$raw) =~ /^(.*) \$= (.*)$/s) {
+	  ($raw,$t) = ($1,rtt_escape($2));
 	} else {
-	  $t = $raw;
+	  $t = rtt_escape($raw);
 	}
 	$rest = $t . (defined($rest) ? "\t$rest" : '');
       }
