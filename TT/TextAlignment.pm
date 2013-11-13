@@ -208,9 +208,9 @@ sub fromRttFile {
 	  $pos   += bytes::length($ctxt);
 	}
 	if (($rt=$raw) =~ /^(.*) \$= (.*)$/s) {
-	  ($raw,$t) = ($1,rtt_escape($2));
+	  ($raw,$t) = ($1,escape_rtt($2));
 	} else {
-	  $t = rtt_escape($raw);
+	  $t = escape_rtt($raw);
 	}
 	$rest = $t . (defined($rest) ? "\t$rest" : '');
       }
