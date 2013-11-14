@@ -63,7 +63,9 @@ if ($txtfile eq '-') {
 my ($ttfh,$ttfile) = File::Temp::tempfile("waste_txt2rtt_${$}_XXXX", SUFFIX=>'.tt', UNLINK=>!$keeptmp);
 open(TOK, "-|",
      $tokenizer,
-     ($tokenizer =~ 'waste' ? ('-v2', '-Otext,loc') : qw()),
+     ($tokenizer =~ 'waste'
+      ? ('-v2', '-Otext,loc', (-r 'waste.rc' ? '-cwaste.rc' : qw()),
+      : qw()),
      @ARGV, $txtfile)
   or die("$prog: failed to open pipe from tokenizer '$tokenizer': $!");
 binmode($_,':raw') foreach ($ttfh,\*TOK);
