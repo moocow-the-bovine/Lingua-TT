@@ -106,6 +106,7 @@ sub toRttFile {
     if ($pos < $off) {
       $ctxt .= escape_rtt(bytes::substr($$bufr,$pos,$off-$pos));
       utf8::decode($ctxt) if ($buf_is_utf8);
+      $ctxt =~ s/%%.*?%%//g if (!$opts{keep_text_comments});
       if ($ctxt ne '' && (!$compact || $ctxt !~ /^\s+$/)) {
 	$fh->print("%%\$c=$ctxt\n");
 	$ctxt = '';
