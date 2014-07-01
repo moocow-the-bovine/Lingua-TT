@@ -1,7 +1,7 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Sort.pm
-## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
-## Descript: TT I/O: tokens (and comments)
+## Author: Bryan Jurish <moocow@cpan.org>
+## Descript: TT: sorting (using system 'sort' cmd)
 
 
 package Lingua::TT::Sort;

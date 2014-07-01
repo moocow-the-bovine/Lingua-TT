@@ -82,14 +82,18 @@ sub vmsg {
 }
 
 ## dumpSentence()
-our ($buf,$ntoks,$nsents,$outi,@outfh,$pntoks,@ntoks,@nsents);
+our ($buf,$ntoks,$nsents,$outi,@outfh,$pntoks);
+our @ntoks  = (0,0);
+our @nsents = (0,0);
 sub dumpSentence {
-  --$ntoks;
-  ++$nsents;
+  --$ntoks if (!$bytoken);
   $outi = (rand() <= $frac1 ? 0 : 1);
   $outfh[$outi]->print($buf);
   $ntoks[$outi] += ($ntoks-$pntoks);
-  $nsents[$outi]++;
+  if ($buf =~ /\n\n\z/) {
+    ++$nsents[$outi];
+    ++$nsents;
+  }
   $pntoks = $ntoks;
   $buf = '';
 }
@@ -118,11 +122,11 @@ foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for file '$infile': $!");
   our $infh = $ttin->{fh};
-  $buf   = '';
+  $buf = '';
   while (defined($line=<$infh>)) {
     $buf .= $line;
     ++$ntoks;
-    dumpSentence if ($line =~ /^$/);
+    dumpSentence($line =~ /^$/ || ($bytoken && $line !~ /^(?:%%.*)$/));
   }
   dumpSentence if ($buf);
 }
@@ -134,8 +138,9 @@ print STDERR
 
 ##-- Summarize
 our $nitems = $bytoken ? $ntoks : $nsents;
-our ($ntoks1,$ntoks2) = @ntoks;
+our ($ntoks1,$ntoks2)   = @ntoks;
 our ($nsents1,$nsents2) = @nsents;
+$nsents ||= 1;
 
 $flen = length($outfile1) > length($outfile2) ? length($outfile1) : length($outfile2);
 $ilen = length($ntoks);
