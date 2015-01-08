@@ -1,0 +1,185 @@
+#!/usr/bin/perl -w
+
+use lib '.';
+use Lingua::TT;
+use RocksDB;
+use Encode qw(encode decode);
+
+use Getopt::Long qw(:config no_ignore_case);
+use Pod::Usage;
+use File::Basename qw(basename);
+
+##----------------------------------------------------------------------
+## Globals
+##----------------------------------------------------------------------
+
+our $prog = basename($0);
+our $VERSION  = "0.01";
+
+our %dbf      = (encoding=>undef);
+
+our $oencoding = undef;
+our $outfile   = '-';
+
+##----------------------------------------------------------------------
+## Command-line processing
+##----------------------------------------------------------------------
+GetOptions(##-- general
+	   'help|h' => \$help,
+	   #'man|m'  => \$man,
+	   #'version|V' => \$version,
+	   #'verbose|v=i' => \$verbose,
+
+	   ##-- db options
+	   'db-encoding|dbe|de=s' => \$dbf{encoding},
+
+	   ##-- I/O
+	   'output|o=s' => \$outfile,
+	   'output-encoding|oencoding|oe=s' => \$oencoding,
+	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
+	  );
+
+pod2usage({-exitval=>0,-verbose=>0}) if ($help);
+pod2usage({-exitval=>0,-verbose=>0,-msg=>'No CDB file specified!'}) if (!@ARGV);
+
+##----------------------------------------------------------------------
+## Subs
+
+
+##----------------------------------------------------------------------
+## MAIN
+##----------------------------------------------------------------------
+
+##-- open db
+my $dbfile = shift(@ARGV);
+our $dbf = RocksDB->new($dbfile, {create_if_missing=>0, read_only=>1})
+  or die("$prog: could not open RocksDB file '$dbfile': $!");
+our $tied = $dbf;
+
+##-- open output handle
+our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$oencoding)
+  or die("$0: open failed for '$outfile': $!");
+our $outfh = $ttout->{fh};
+
+##-- dump DB
+my ($key,$val);
+my $iter = $dbf->new_iterator->seek_to_first;
+while (($key,$val) = $iter->each) {
+  $outfh->print($key,"\t",$val,"\n");
+}
+
+undef($tied);
+undef $dbf;
+$ttout->close;
+
+
+__END__
+
+###############################################################
+## pods
+###############################################################
+
+=pod
+
+=head1 NAME
+
+tt-rdb2dict.perl - convert RocksDB dictionary to text
+
+=head1 SYNOPSIS
+
+ tt-rdb2dict.perl [OPTIONS] ROCKSDB_FILE
+
+ General Options:
+   -help
+
+ I/O Options:
+   -output FILE           ##-- default: STDOUT
+   -db-encoding ENC       ##-- set CDB-internal encoding (default: null)
+   -output-encoding ENC   ##-- output encoding (default: null)
+   -encoding ENC          ##-- alias for -db-encoding=ENC -output-encoding=ENC
+
+=cut
+
+###############################################################
+## OPTIONS
+###############################################################
+=pod
+
+=head1 OPTIONS
+
+=cut
+
+###############################################################
+# General Options
+###############################################################
+=pod
+
+=head2 General Options
+
+=over 4
+
+=item -help
+
+Display a brief help message and exit.
+
+=item -version
+
+Display version information and exit.
+
+=item -verbose LEVEL
+
+Set verbosity level to LEVEL.  Default=1.
+
+=back
+
+=cut
+
+
+###############################################################
+# Other Options
+###############################################################
+=pod
+
+=head2 Other Options
+
+=over 4
+
+=item -someoptions ARG
+
+Example option.
+
+=back
+
+=cut
+
+
+###############################################################
+# Bugs and Limitations
+###############################################################
+=pod
+
+=head1 BUGS AND LIMITATIONS
+
+Probably many.
+
+=cut
+
+
+###############################################################
+# Footer
+###############################################################
+=pod
+
+=head1 ACKNOWLEDGEMENTS
+
+Perl by Larry Wall.
+
+=head1 AUTHOR
+
+Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
+
+=head1 SEE ALSO
+
+perl(1).
+
+=cut
