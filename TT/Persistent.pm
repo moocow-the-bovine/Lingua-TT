@@ -1,7 +1,7 @@
 ## -*- Mode: CPerl -*-
 ##
 ## File: Lingua::TT::Persistent.pm
-## Author: Bryan Jurish <jurish@uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Description: abstract class for persistent & configurable objects
 
 package Lingua::TT::Persistent;
@@ -849,7 +849,7 @@ Load from a generic string $str.
 
 =head1 AUTHOR
 
-Bryan Jurish E<lt>jurish@bbaw.deE<gt>
+Bryan Jurish E<lt>TT/IO.pmE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 

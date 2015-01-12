@@ -95,7 +95,7 @@ tt-cdbapply.perl - apply CDB dictionary analyses to TT file(s)
 
 =head1 SYNOPSIS
 
- tt-dbapply.perl [OPTIONS] CDB_FILE [TT_FILE(s)]
+ tt-cdbapply.perl [OPTIONS] CDB_FILE [TT_FILE(s)]
 
  General Options:
    -help
@@ -185,7 +185,7 @@ Perl by Larry Wall.
 
 =head1 AUTHOR
 
-Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
+Bryan Jurish E<lt>moocow@cpan.orgE<gt>
 
 =head1 SEE ALSO
 

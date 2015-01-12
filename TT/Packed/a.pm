@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Packed::a.pm
-## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT I/O: packed docs: human-readable ascii decimal
 
 package Lingua::TT::Packed::a;

@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Sort.pm
-## Author: Bryan Jurish <moocow@cpan.org>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT: sorting (using system 'sort' cmd)
 
 

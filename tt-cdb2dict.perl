@@ -16,11 +16,9 @@ use File::Basename qw(basename);
 our $prog = basename($0);
 our $VERSION  = "0.01";
 
-our $include_empty = 0;
-our %dbf           = (encoding=>undef);
-
+our %dbf       = (encoding=>undef);
 our $oencoding = undef;
-our $outfile  = '-';
+our $outfile   = '-';
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -179,7 +177,7 @@ Perl by Larry Wall.
 
 =head1 AUTHOR
 
-Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
+Bryan Jurish E<lt>moocow@cpan.orgE<gt>
 
 =head1 SEE ALSO
 

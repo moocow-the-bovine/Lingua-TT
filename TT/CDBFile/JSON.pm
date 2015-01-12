@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::CDBFile,,1S6N.pm
-## Author: Bryan Jurish <jurish@uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT I/O: CDB: tied read-only access via CDB_File, JSON values
 
 package Lingua::TT::CDBFile::JSON;

@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::DBx::Field.pm
-## Author: Bryan Jurish <jurish@uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT I/O: Berkely DB: enumerated fields
 
 package Lingua::TT::DBx::Field;

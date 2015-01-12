@@ -110,7 +110,6 @@ tt-dict2cdb.perl - convert a text dictionary to a CDB_File
  DB_File Options:
   -append , -truncate   ##-- do/don't append to existing db (default=-append)
   -empty  , -noempty    ##-- do/don't create records for empty analyses
-  -db-option OPT=VAL    ##-- set DB_File option
   -db-encoding ENC      ##-- set DB internal encoding (default: null)
 
  I/O Options:
@@ -197,7 +196,7 @@ Perl by Larry Wall.
 
 =head1 AUTHOR
 
-Bryan Jurish E<lt>jurish@uni-potsdam.deE<gt>
+Bryan Jurish E<lt>moocow@cpan.orgE<gt>
 
 =head1 SEE ALSO
 

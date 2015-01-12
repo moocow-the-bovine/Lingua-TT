@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Packed::z.pm
-## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT I/O: packed docs: using (our own) Encode::Base128
 
 package Lingua::TT::Packed::z;

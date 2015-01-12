@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::TextAlignment.pm
-## Author: Bryan Jurish <moocow@cpan.org>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT Utils: alignment raw text <-> tokenized text
 
 

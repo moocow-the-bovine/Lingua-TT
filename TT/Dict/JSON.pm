@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT::Dict::JSON.pm
-## Author: Bryan Jurish <jurish@uni-potsdam.de>
+## Author: Bryan Jurish <TT/IO.pm>
 ## Descript: TT Utils: dictionary: JSON
 
 package Lingua::TT::Dict::JSON;
