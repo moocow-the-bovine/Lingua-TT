@@ -23,6 +23,7 @@ our $verbose      = 0;
 our $eos	  = '__$';
 our $n  	  = 2;
 
+our $listmode = 0;
 our $fieldsep = "\x{0b}"; ##-- field separator (internal); 0x0b=VT (vertical tab)
 our $wordsep  = "\t";     ##-- word separator (external)
 
@@ -35,6 +36,7 @@ GetOptions(##-- general
 	  'verbose|v=i' => \$verbose,
 
 	   ##-- Behavior
+	   'list|l!' => \$list,
 	   'eos|e=s' => \$eos,
 	   'n|k=i' => \$n,
 	   'field-separator|fs|f=s' => \$fieldsep,
@@ -70,7 +72,21 @@ sub vmsg {
 ##----------------------------------------------------------------------
 
 push(@ARGV,'-') if (!@ARGV);
-foreach my $ttfile (@ARGV) {
+my @ttfiles = @ARGV;
+if ($list) {
+  @ttfiles = qw();
+  foreach my $listfile (@ARGV) {
+    open(my $listfh,"<$listfile") or die("$0: open failed for list-file $listfile: $!");
+    while (defined($_=<$listfh>)) {
+      chomp;
+      next if (/^\s*$/ || /^%%/);
+      push(@ttfiles,$_);
+    }
+    close($listfh);
+  }
+}
+
+foreach my $ttfile (@ttfiles) {
   vmsg(1,"$prog: processing $ttfile...\n");
 
   our $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>undef)
@@ -137,6 +153,7 @@ tt-ngrams.perl - compute raw n-grams from a tt-file
    -fs FIELDSEP              ##-- set word-internal field separator (default=VTAB)
    -ws WORDSEP               ##-- set word separator (default=TAB)
    -eos EOS	             ##-- set EOS string (default=__$)
+   -[no]list		     ##-- do/don't TT_FILE(s) as filename-lists (default=don't)
    -output OUTFILE           ##-- set output file (default=STDOUT)
 
 =cut
