@@ -86,6 +86,9 @@ if ($list) {
   }
 }
 
+open(my $outfh,">$outfile")
+  or die("$0: open failed for output-file '$outfile': $!");
+
 foreach my $ttfile (@ttfiles) {
   vmsg(1,"$prog: processing $ttfile...\n");
 
@@ -95,7 +98,7 @@ foreach my $ttfile (@ttfiles) {
 
   my $last_was_eos = 1;
   my @ng = map {$eos} (1..$n);
-  print join($wordsep,@ng), "\n";
+  print $outfh join($wordsep,@ng), "\n";
 
   while (defined($_=<$infh>)) {
     next if (/^\%\%/); ##-- comment or blank line
@@ -107,14 +110,14 @@ foreach my $ttfile (@ttfiles) {
       foreach (1..$n) {
 	shift(@ng);
 	push(@ng,$eos);
-	print join($wordsep,@ng), "\n";
+	print $outfh join($wordsep,@ng), "\n";
       }
       $last_was_eos = 1;
     } else {
       s{\t}{$fieldsep}g if ($fieldsep ne "\t");
       shift(@ng);
       push(@ng,$_);
-      print join($wordsep,@ng), "\n";
+      print $outfh join($wordsep,@ng), "\n";
       $last_was_eos = 0;
     }
   }
@@ -125,9 +128,12 @@ foreach my $ttfile (@ttfiles) {
   foreach (1..$n) {
     shift(@ng);
     push(@ng,$eos);
-    print join($wordsep,@ng), "\n";
+    print $outfh join($wordsep,@ng), "\n";
   }
 }
+
+close($outfh)
+  or die("$0: failed to close output file $outfile: $!");
 
 ###############################################################
 ## pods
