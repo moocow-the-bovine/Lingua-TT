@@ -27,6 +27,7 @@ our $n  	  = 2;
 our $listmode = 0;
 our $fieldsep = "\x{0b}"; ##-- field separator (internal); 0x0b=VT (vertical tab)
 our $wordsep  = "\t";     ##-- word separator (external)
+our $ordered  = 1;        ##-- use ordered skip-grams?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -42,6 +43,8 @@ GetOptions(##-- general
 	   'n|k=i' => \$n,
 	   'field-separator|fs|f=s' => \$fieldsep,
 	   'record-separator|rs|r|word-separator|ws|w=s' => \$wordsep,
+	   'directed|d|ordered|order|O!' => \$ordered,
+	   'undirected|unordered|unorder|u!' => sub { $ordered=!$_[1]; },
 
 	   ##-- I/O
 	   'output|out|o=s' => \$outfile,
@@ -98,8 +101,8 @@ foreach my $ttfile (@ttfiles) {
   our $infh = $ttin->{fh};
 
   my $last_was_eos = 1;
-  my @ng = map {$eos} (1..$n);
-  print $outfh join($wordsep,@ng), "\n";
+  my @ng = ($eos);
+  #print $outfh join($wordsep,@ng), "\n";
 
   while (defined($_=<$infh>)) {
     next if (/^\%\%/); ##-- comment or blank line
@@ -108,29 +111,23 @@ foreach my $ttfile (@ttfiles) {
     if (/^$/) {
       ##-- eos: flush n-gram window
       next if ($last_was_eos);
-      foreach (1..$n) {
-	shift(@ng);
-	push(@ng,$eos);
-	print $outfh join($wordsep,@ng), "\n";
-      }
+      print $outfh map {join($wordsep, $ordered || $ng[$_] lt $eos ? ($ng[$_],$eos) : ($eos,$ng[$_]))."\n"} (1..$#ng);
       $last_was_eos = 1;
+      @ng = ($eos);
     } else {
       s{\t}{$fieldsep}g if ($fieldsep ne "\t");
-      shift(@ng);
+      shift(@ng) if (@ng==$n);
       push(@ng,$_);
-      print $outfh join($wordsep,@ng), "\n";
+      print $outfh map {join($wordsep, $ordered || $ng[$_] lt $ng[$#ng] ? ($ng[$_],$ng[$#ng]) : ($ng[$#ng],$ng[$_]))."\n"} (0..($#ng-1));
       $last_was_eos = 0;
     }
   }
 
   $ttin->close();
 
+  ##-- final eos
   next if ($last_was_eos);
-  foreach (1..$n) {
-    shift(@ng);
-    push(@ng,$eos);
-    print $outfh join($wordsep,@ng), "\n";
-  }
+  print $outfh map {join($wordsep, $ordered || $ng[$_] lt $eos ? ($ng[$_],$eos) : ($eos,$ng[$_]))."\n"} (1..$#ng);
 }
 
 close($outfh)
@@ -144,7 +141,7 @@ close($outfh)
 
 =head1 NAME
 
-tt-ngrams.perl - compute raw n-grams from a tt-file
+tt-skipgrams.perl - compute raw skip-gram pairs (windowed co-occurrence pairs) from a tt-file
 
 =head1 SYNOPSIS
 
@@ -160,6 +157,7 @@ tt-ngrams.perl - compute raw n-grams from a tt-file
    -fs FIELDSEP              ##-- set word-internal field separator (default=VTAB)
    -ws WORDSEP               ##-- set word separator (default=TAB)
    -eos EOS	             ##-- set EOS string (default=__$)
+   -[un]ordered              ##-- do/don't compute ordered co-occurrence pairs (default=-ordered)
    -[no]list		     ##-- do/don't TT_FILE(s) as filename-lists (default=don't)
    -output OUTFILE           ##-- set output file (default=STDOUT)
 
