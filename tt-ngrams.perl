@@ -7,6 +7,7 @@ use File::Basename qw(basename dirname);
 
 use lib '.';
 use Lingua::TT;
+use Lingua::TT::Unigrams;
 
 BEGIN { select STDERR; $|=1; select STDOUT; $|=0; }
 
@@ -27,6 +28,8 @@ our $n  	  = 2;
 our $listmode = 0;
 our $fieldsep = "\x{0b}"; ##-- field separator (internal); 0x0b=VT (vertical tab)
 our $wordsep  = "\t";     ##-- word separator (external)
+our $count = 1;           ##-- count-mode (true) or print-mode (false)
+our $sort = 'freq';	  ##-- sort order for count-mode
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -42,8 +45,13 @@ GetOptions(##-- general
 	   'n|k=i' => \$n,
 	   'field-separator|fs|f=s' => \$fieldsep,
 	   'record-separator|rs|r|word-separator|ws|w=s' => \$wordsep,
+	   'count|c!' => \$count,
+	   'print|p|raw!' => sub { $count=!$_[1]; },
 
 	   ##-- I/O
+	   'nosort' => sub { $count=1; $sort='none'; },
+	   'freqsort|fsort|freq' => sub {$count=1; $sort='freq'; },
+	   'lexsort|lsort|lex' => sub { $count=1; $sort='lex'; },
 	   'output|out|o=s' => \$outfile,
 	  );
 
@@ -77,7 +85,7 @@ my @ttfiles = @ARGV;
 if ($list) {
   @ttfiles = qw();
   foreach my $listfile (@ARGV) {
-    open(my $listfh,"<$listfile") or die("$0: open failed for list-file $listfile: $!");
+    open(my $listfh,"<$listfile") or die("$prog: open failed for list-file $listfile: $!");
     while (defined($_=<$listfh>)) {
       chomp;
       next if (/^\s*$/ || /^%%/);
@@ -87,8 +95,17 @@ if ($list) {
   }
 }
 
-open(my $outfh,">$outfile")
-  or die("$0: open failed for output-file '$outfile': $!");
+our (%wf,$ug,$outfh);
+my $countsub = undef;
+if ($count) {
+  %wf = qw(); ##-- ($ngram => $freq, ...)
+  $ug = Lingua::TT::Unigrams->new(wf=>\%wf);
+  $countsub = sub { ++$wf{$_[0]}; };
+} else {
+  open($outfh,">$outfile")
+    or die("$prog: open failed for output-file '$outfile': $!");
+  $countsub = sub { print $outfh $_[0], "\n"; };
+}
 
 foreach my $ttfile (@ttfiles) {
   vmsg(1,"$prog: processing $ttfile...\n");
@@ -99,7 +116,7 @@ foreach my $ttfile (@ttfiles) {
 
   my $last_was_eos = 1;
   my @ng = map {$eos} (1..$n);
-  print $outfh join($wordsep,@ng), "\n";
+  $countsub->(join($wordsep,@ng));
 
   while (defined($_=<$infh>)) {
     next if (/^\%\%/); ##-- comment or blank line
@@ -111,14 +128,14 @@ foreach my $ttfile (@ttfiles) {
       foreach (1..$n) {
 	shift(@ng);
 	push(@ng,$eos);
-	print $outfh join($wordsep,@ng), "\n";
+	$countsub->(join($wordsep,@ng));
       }
       $last_was_eos = 1;
     } else {
       s{\t}{$fieldsep}g if ($fieldsep ne "\t");
       shift(@ng);
       push(@ng,$_);
-      print $outfh join($wordsep,@ng), "\n";
+      $countsub->(join($wordsep,@ng));
       $last_was_eos = 0;
     }
   }
@@ -129,12 +146,17 @@ foreach my $ttfile (@ttfiles) {
   foreach (1..$n) {
     shift(@ng);
     push(@ng,$eos);
-    print $outfh join($wordsep,@ng), "\n";
+    $countsub->(join($wordsep,@ng));
   }
 }
 
-close($outfh)
-  or die("$0: failed to close output file $outfile: $!");
+if ($count) {
+  $ug->saveNativeFile($outfile,sort=>$sort,encoding=>undef)
+    or die("$prog: save failed to '$outfile': $!");
+} else {
+  close($outfh)
+    or die("$prog: failed to close output file $outfile: $!");
+}
 
 ###############################################################
 ## pods
@@ -144,7 +166,7 @@ close($outfh)
 
 =head1 NAME
 
-tt-ngrams.perl - compute raw n-grams from a tt-file
+tt-ngrams.perl - compute n-grams from a tt-file
 
 =head1 SYNOPSIS
 
@@ -161,6 +183,11 @@ tt-ngrams.perl - compute raw n-grams from a tt-file
    -ws WORDSEP               ##-- set word separator (default=TAB)
    -eos EOS	             ##-- set EOS string (default=__$)
    -[no]list		     ##-- do/don't TT_FILE(s) as filename-lists (default=don't)
+   -[no]count                ##-- do/don't compute n-gram counts (default=do)
+   -raw                      ##-- alias for -nocount
+   -nosort                   ##-- don't sort output, implies -count
+   -lexsort                  ##-- sort output lexicographically; implies -count
+   -freqsort                 ##-- sort output by frequency; implies -count
    -output OUTFILE           ##-- set output file (default=STDOUT)
 
 =cut
