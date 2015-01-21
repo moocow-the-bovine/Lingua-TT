@@ -25,7 +25,8 @@ our $verbose      = 0;
 our $eos	  = '__$';
 our $n  	  = 2;
 
-our $listmode = 0;
+our $listargs = 0;
+our $globargs = 0;
 our $fieldsep = "\x{0b}"; ##-- field separator (internal); 0x0b=VT (vertical tab)
 our $wordsep  = "\t";     ##-- word separator (external)
 our $count = 1;           ##-- count-mode (true) or print-mode (false)
@@ -40,7 +41,6 @@ GetOptions(##-- general
 	  'verbose|v=i' => \$verbose,
 
 	   ##-- Behavior
-	   'list|l!' => \$list,
 	   'eos|e=s' => \$eos,
 	   'n|k=i' => \$n,
 	   'field-separator|fs|f=s' => \$fieldsep,
@@ -49,6 +49,8 @@ GetOptions(##-- general
 	   'print|p|raw!' => sub { $count=!$_[1]; },
 
 	   ##-- I/O
+	   'glob|g!' => \$globargs,
+	   'list|l!' => \$listargs,
 	   'nosort' => sub { $count=1; $sort='none'; },
 	   'freqsort|fsort|freq' => sub {$count=1; $sort='freq'; },
 	   'lexsort|lsort|lex' => sub { $count=1; $sort='lex'; },
@@ -81,15 +83,16 @@ sub vmsg {
 ##----------------------------------------------------------------------
 
 push(@ARGV,'-') if (!@ARGV);
-my @ttfiles = @ARGV;
-if ($list) {
-  @ttfiles = qw();
-  foreach my $listfile (@ARGV) {
+my @infiles = $globargs ? (map {glob($_)} @ARGV) : @ARGV;
+my $ttfiles = \@infiles;
+if ($listargs) {
+  $ttfiles = [];
+  foreach my $listfile (@infiles) {
     open(my $listfh,"<$listfile") or die("$prog: open failed for list-file $listfile: $!");
     while (defined($_=<$listfh>)) {
       chomp;
       next if (/^\s*$/ || /^%%/);
-      push(@ttfiles,$_);
+      push(@$ttfiles,$_);
     }
     close($listfh);
   }
@@ -107,7 +110,7 @@ if ($count) {
   $countsub = sub { print $outfh $_[0], "\n"; };
 }
 
-foreach my $ttfile (@ttfiles) {
+foreach my $ttfile (@$ttfiles) {
   vmsg(1,"$prog: processing $ttfile...\n");
 
   our $ttin = Lingua::TT::IO->fromFile($ttfile,encoding=>undef)
@@ -166,7 +169,7 @@ if ($count) {
 
 =head1 NAME
 
-tt-ngrams.perl - compute n-grams from a tt-file
+tt-ngrams.perl - compute n-grams from tt-file(s)
 
 =head1 SYNOPSIS
 
@@ -177,12 +180,15 @@ tt-ngrams.perl - compute n-grams from a tt-file
    -version                  ##-- print version and exit
    -verbose LEVEL            ##-- set verbosity (0..?)
 
- I/O Options:
+ N-gram Options:
    -n N                      ##-- set n-gram length (default=2)
    -fs FIELDSEP              ##-- set word-internal field separator (default=VTAB)
    -ws WORDSEP               ##-- set word separator (default=TAB)
    -eos EOS	             ##-- set EOS string (default=__$)
-   -[no]list		     ##-- do/don't TT_FILE(s) as filename-lists (default=don't)
+
+ I/O Options:
+   -[no]glob                 ##-- do/don't glob TT_FILE argument(s) (default=don't)
+   -[no]list		     ##-- do/don't treat TT_FILE(s) as filename-lists (default=don't)
    -[no]count                ##-- do/don't compute n-gram counts (default=do)
    -raw                      ##-- alias for -nocount
    -nosort                   ##-- don't sort output, implies -count
