@@ -30,7 +30,7 @@ our $DEFAULT_TYPE = 'BTREE';
 ## + %opts, %$doc:
 ##   ##-- user options
 ##   file  => $filename,    ##-- default: undef (none)
-##   mode  => $mode,       ##-- default: 0644
+##   mode  => $mode,       ##-- default: 0666 & ~umask
 ##   flags => $flags,      ##-- default: O_RDWR|O_CREAT
 ##   type    => $type,     ##-- one of 'HASH', 'BTREE', 'RECNO', 'GUESS' (default: 'GUESS' for read, $DEFAULT_TYPE otherwise)
 ##   dbinfo  => \%dbinfo,  ##-- default: "DB_File::${type}INFO"->new();
@@ -45,7 +45,7 @@ sub new {
   my $db = bless({
 		  file   => undef,
 		  encoding => undef,
-		  mode   => 0644,
+		  mode   => (0644 & ~umask),
 		  flags  => (O_RDWR|O_CREAT),
 		  type   => undef, ##-- no default type (guess)
 		  dbinfo => undef,
