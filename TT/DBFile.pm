@@ -329,7 +329,7 @@ sub packFilterStore {
     };
   } else {
     return sub {
-      $_ = pack($packas,ref($_) ? @$_ : split($dbf->{packsep},$_));
+      $_ = pack($packas,ref($_) ? @$_ : split($packsep,$_));
     };
   }
 }
