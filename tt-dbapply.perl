@@ -45,6 +45,8 @@ GetOptions(##-- general
 	   'output|o=s' => \$outfile,
 	   'tt-encoding|te|ie|oe=s' => \$ttencoding,
 	   'encoding|e=s' => sub {$ttencoding=$dbencoding=$_[1]},
+	   'pack-key|pk=s' => \$dbf{pack_key},
+	   'pack-value|pv=s' => \$dbf{pack_val},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -127,6 +129,8 @@ tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
  I/O Options:
   -output FILE          ##-- default: STDOUT
   -encoding ENCODING    ##-- default: UTF-8
+  -pack-key PACKAS      ##-- set pack/unpack template for DB keys
+  -pack-val PACKAS      ##-- set pack/unpack template for DB values
   -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
 
 =cut

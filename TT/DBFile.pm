@@ -38,6 +38,7 @@ our $DEFAULT_TYPE = 'BTREE';
 ##   encoding => $enc,     ##-- if defined, $enc will be used to store db data (uses Encode and DB filters); default=undef (raw bytes)
 ##   pack_key => $packas,  ##-- if defined, $packas will be used to (un)pack db keys
 ##   pack_val => $packas,  ##-- if defined, $packas will be used to (un)pack db values
+##   pack_sep => $str,     ##-- separator string for multi-value pack/unpack (default="\t")
 ##   ##
 ##   ##-- low-level data
 ##   data   => $thingy,    ##-- tied data (hash or array)
@@ -49,6 +50,7 @@ sub new {
 		  encoding => undef,
 		  pack_key => undef,
 		  pack_val => undef,
+		  pack_sep => "\t",
 		  mode   => (0644 & ~umask),
 		  flags  => (O_RDWR|O_CREAT),
 		  type   => undef, ##-- no default type (guess)
@@ -301,7 +303,8 @@ sub encFilterStore {
 ## \&filter_sub = $dbf->packFilterFetch($packas)
 ##   + returns a DB FETCH-filter sub for transparent unpacking of DB-data from $packas
 sub packFilterFetch {
-  my $packas = $_[1];
+  my ($dbf,$packas) = @_;
+  my $packsep = $dbf->{pack_sep} // "\t";
   return undef if (!$packas || $packas eq 'raw');
   if (length($packas)==1) {
     return sub {
@@ -309,7 +312,7 @@ sub packFilterFetch {
     };
   } else {
     return sub {
-      $_ = [unpack($packas,$_)];
+      $_ = join($packsep,unpack($packas,$_));
     }
   }
 }
@@ -317,7 +320,8 @@ sub packFilterFetch {
 ## \&filter_sub = $db->packFilterStore($packas)
 ##   + returns a DB STORE-filter sub for transparent encoding of DB-data to $encoding
 sub packFilterStore {
-  my $packas = $_[1];
+  my ($dbf,$packas) = @_;
+  my $packsep = $dbf->{packsep} // "\t";
   return undef if (!$packas || $packas eq 'raw');
   if (length($packas)==1) {
     return sub {
@@ -325,7 +329,7 @@ sub packFilterStore {
     };
   } else {
     return sub {
-      $_ = pack($packas,@$_);
+      $_ = pack($packas,ref($_) ? @$_ : split($dbf->{packsep},$_));
     };
   }
 }

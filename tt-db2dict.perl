@@ -85,7 +85,7 @@ for ($status = $tied->seq($key,$val,R_FIRST);
     #$line = decode($dbencoding,$line) if (defined($dbencoding));
     #$outfh->print($line);
     ##--
-    $outfh->print(join("\t", (ref($key) ? @$key : $key), (ref($val) ? @$val : $val)), "\n");
+    $outfh->print($key, "\t", $val, "\n");
   }
 
 undef($data);
