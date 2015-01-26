@@ -46,6 +46,8 @@ GetOptions(##-- general
 	   'output|o=s' => \$outfile,
 	   'output-encoding|oencoding|oe=s' => \$oencoding,
 	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
+	   'pack-key|pk=s' => \$dbf{pack_key},
+	   'pack-value|pv=s' => \$dbf{pack_val},
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -83,7 +85,7 @@ for ($status = $tied->seq($key,$val,R_FIRST);
     #$line = decode($dbencoding,$line) if (defined($dbencoding));
     #$outfh->print($line);
     ##--
-    $outfh->print($key,"\t",$val,"\n");
+    $outfh->print(join("\t", (ref($key) ? @$key : $key), (ref($val) ? @$val : $val)), "\n");
   }
 
 undef($data);
@@ -118,9 +120,11 @@ tt-db2dict.perl - convert DB dictionary to text
   -db-encoding ENC        ##-- set DB internal encoding (default: null)
 
  I/O Options:
-   -output FILE           ##-- default: STDOUT
-   -output-encoding ENC   ##-- output encoding (default: null)
-   -encoding ENC          ##-- alias for -db-encoding=ENC -output-encoding=ENC
+  -output FILE            ##-- default: STDOUT
+  -output-encoding ENC    ##-- output encoding (default: null)
+  -encoding ENC           ##-- alias for -db-encoding=ENC -output-encoding=ENC
+  -pack-key PACKAS        ##-- set pack/unpack template for DB keys
+  -pack-val PACKAS        ##-- set pack/unpack template for DB values
 
 =cut
 

@@ -50,6 +50,8 @@ GetOptions(##-- general
 	   'output-db|output|out|o|odb|db=s' => \$outfile,
 	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbf{encoding},
 	   'encoding|e=s' => sub {$iencoding=$dbf{encoding}=$_[1]},
+	   'pack-key|pk=s' => \$dbf{pack_key},
+	   'pack-value|pv=s' => \$dbf{pack_val},
 	   'tempdir|tmpdir|temp|tmp|td=s' => \$tmpdir,
 	  );
 
@@ -144,7 +146,7 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
  General Options:
    -help
 
- DB_File Options:
+ DB Options:
   -hash   , -btree      ##-- select DB output type (default='BTREE')
   -append , -truncate   ##-- do/don't append to existing db (default=-append)
   -empty  , -noempty    ##-- do/don't create records for empty analyses
@@ -156,6 +158,8 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
  I/O Options:
    -input-encoding ENC  ##-- set input encoding (default: null)
    -encoding ENC        ##-- alias for -input-encoding=ENC -db-encoding=ENC
+   -pack-key PACKAS     ##-- set pack/unpack template for DB keys
+   -pack-val PACKAS     ##-- set pack/unpack template for DB values
    -output FILE         ##-- default: STDOUT
    -tmpdir DIR          ##-- build temporary DB in DIR then copy (e.g. tmpfs)
 

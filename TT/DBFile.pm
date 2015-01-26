@@ -36,6 +36,8 @@ our $DEFAULT_TYPE = 'BTREE';
 ##   dbinfo  => \%dbinfo,  ##-- default: "DB_File::${type}INFO"->new();
 ##   dbopts  => \%opts,    ##-- db options (e.g. cachesize,bval,...) -- defaults to none (uses DB_File defaults)
 ##   encoding => $enc,     ##-- if defined, $enc will be used to store db data (uses Encode and DB filters); default=undef (raw bytes)
+##   pack_key => $packas,  ##-- if defined, $packas will be used to (un)pack db keys
+##   pack_val => $packas,  ##-- if defined, $packas will be used to (un)pack db values
 ##   ##
 ##   ##-- low-level data
 ##   data   => $thingy,    ##-- tied data (hash or array)
@@ -45,6 +47,8 @@ sub new {
   my $db = bless({
 		  file   => undef,
 		  encoding => undef,
+		  pack_key => undef,
+		  pack_val => undef,
 		  mode   => (0644 & ~umask),
 		  flags  => (O_RDWR|O_CREAT),
 		  type   => undef, ##-- no default type (guess)
@@ -201,7 +205,7 @@ sub open {
       or confess(ref($dbf).":open(): tie() failed for $dbf->{type} file '$dbf->{file}': $!");
   }
 
-  ##-- install encoding filters
+  ##-- maybe install encoding filters
   if (defined($dbf->{encoding}) && $dbf->{encoding} ne 'raw') {
     my $ffetch = $dbf->encFilterFetch();
     my $fstore = $dbf->encFilterStore();
@@ -211,6 +215,17 @@ sub open {
     }
     $dbf->{tied}->filter_fetch_value($ffetch);
     $dbf->{tied}->filter_store_value($fstore);
+  }
+  else {
+    ##-- maybe install pack filters
+    if (defined($dbf->{pack_key}) && $dbf->{pack_key} ne 'raw' && uc($dbf->{type}) ne 'RECNO') {
+      $dbf->{tied}->filter_fetch_key($dbf->packFilterFetch($dbf->{pack_key}));
+      $dbf->{tied}->filter_store_key($dbf->packFilterStore($dbf->{pack_key}));
+    }
+    if (defined($dbf->{pack_val}) && $dbf->{pack_val} ne 'raw') {
+      $dbf->{tied}->filter_fetch_value($dbf->packFilterFetch($dbf->{pack_val}));
+      $dbf->{tied}->filter_store_value($dbf->packFilterStore($dbf->{pack_val}));
+    }
   }
 
   return $dbf;
@@ -259,7 +274,7 @@ sub noSaveKeys {
 }
 
 ##==============================================================================
-## Utils: Filter
+## Utils: Filters
 
 ## \&filter_sub = $db->encFilterFetch()
 ## \&filter_sub = $db->encFilterFetch($encoding=$db->{encoding})
@@ -281,6 +296,38 @@ sub encFilterStore {
   return sub {
     $_ = encode($enc,$_);
   };
+}
+
+## \&filter_sub = $dbf->packFilterFetch($packas)
+##   + returns a DB FETCH-filter sub for transparent unpacking of DB-data from $packas
+sub packFilterFetch {
+  my $packas = $_[1];
+  return undef if (!$packas || $packas eq 'raw');
+  if (length($packas)==1) {
+    return sub {
+      $_ = unpack($packas,$_);
+    };
+  } else {
+    return sub {
+      $_ = [unpack($packas,$_)];
+    }
+  }
+}
+
+## \&filter_sub = $db->packFilterStore($packas)
+##   + returns a DB STORE-filter sub for transparent encoding of DB-data to $encoding
+sub packFilterStore {
+  my $packas = $_[1];
+  return undef if (!$packas || $packas eq 'raw');
+  if (length($packas)==1) {
+    return sub {
+      $_ = pack($packas,$_);
+    };
+  } else {
+    return sub {
+      $_ = pack($packas,@$_);
+    };
+  }
 }
 
 
