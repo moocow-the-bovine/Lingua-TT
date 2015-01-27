@@ -18,7 +18,7 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'BTREE', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
+our %dbf           = (type=>'GUESS', flags=>O_RDWR, dbopts=>{cachesize=>'32M'});
 our $dbencoding = undef;
 
 our $ttencoding = undef;
@@ -36,7 +36,11 @@ GetOptions(##-- general
 	   ##-- db options
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-recno|recno|dbr' => sub { $dbf{type}='RECNO'; },
+	   'db-guess|guess|dbg' => sub { $dbf{type}='GUESS'; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
+	   'db-reclen|reclen|rl=i' => \$dbf{dbopts}{reclen},
+	   'db-bval|bval|bv=s'     => \$dbf{dbopts}{bval},
 	   'db-option|O=s' => $dbf{dbopts},
 	   'db-encoding|dbe=s' => \$dbencoding,
 
@@ -60,13 +64,11 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No dictionary file specified!'}) if (!
 ## MAIN
 ##----------------------------------------------------------------------
 
-
 ##-- open db
 my $dbfile = shift(@ARGV);
-our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
+our $dbf = Lingua::TT::DBFile->new(%dbf,encoding=>$dbencoding,file=>$dbfile)
   or die("$prog: could not open DB file '$dbfile': $!");
-our $data = $dbf->{data};
-#our $tied = $dbf->{tied};
+our $tied = $dbf->{tied};
 
 ##-- open output handle
 our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
@@ -74,7 +76,7 @@ our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$ttencoding)
 our $outfh = $ttout->{fh};
 
 ##-- process inputs
-our ($text,$a_in,$a_dict);
+our ($text,$a_in,$a_dict,$status);
 foreach $infile (@ARGV ? @ARGV : '-') {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$ttencoding)
     or die("$0: open failed for '$infile': $!");
@@ -84,12 +86,7 @@ foreach $infile (@ARGV ? @ARGV : '-') {
     next if (/^%%/ || /^$/);
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
-    if (defined($dbencoding)) {
-      $a_dict = $data->{encode($dbencoding,$text)};
-      $a_dict = decode($dbencoding,$a_dict) if (defined($a_dict));
-    } else {
-      $a_dict = $data->{$text};
-    }
+    $a_dict = undef if (($status=$tied->get($text,$a_dict)) != 0);
     $_ = join("\t", $text, (defined($a_in) ? $a_in : qw()), (defined($a_dict) && ($include_empty || $a_dict ne '') ? $a_dict : qw()))."\n";
   }
   continue {
@@ -98,6 +95,8 @@ foreach $infile (@ARGV ? @ARGV : '-') {
   $ttin->close;
 }
 
+#undef $data;
+undef $tied;
 $dbf->close;
 $ttout->close;
 
@@ -122,16 +121,19 @@ tt-dbapply.perl - apply DB dictionary analyses to TT file(s)
    -help
 
  DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
-  -db-option OPT=VAL    ##-- set DB_File option
+  -hash , -btree , -recno ##-- select DB output type (default='BTREE')
+  -guess                  ##-- guess DB type (default)
+  -cache SIZE             ##-- set DB cache size (with suffixes K,M,G)
+  -bval BVAL              ##-- separator string for variable-length -recno arrays
+  -reclen RECLEN          ##-- record size in bytes for fixed-length -recno arrays
+  -db-option OPT=VAL      ##-- set DB_File option
 
  I/O Options:
-  -output FILE          ##-- default: STDOUT
-  -encoding ENCODING    ##-- default: UTF-8
-  -pack-key PACKAS      ##-- set pack/unpack template for DB keys
-  -pack-val PACKAS      ##-- set pack/unpack template for DB values
-  -empty , -noempty     ##-- do/don't output empty analyses (default=don't)
+  -output FILE            ##-- default: STDOUT
+  -encoding ENCODING      ##-- default: UTF-8
+  -pack-key PACKAS        ##-- set pack/unpack template for DB keys
+  -pack-val PACKAS        ##-- set pack/unpack template for DB values
+  -empty , -noempty       ##-- do/don't output empty analyses (default=don't)
 
 =cut
 

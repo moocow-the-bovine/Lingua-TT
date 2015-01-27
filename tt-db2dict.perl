@@ -117,7 +117,7 @@ tt-db2dict.perl - convert DB dictionary to text
    -help
 
  DB Options:
-  -hash , -btree , -recno ##-- select DB output type
+  -hash , -btree , -recno ##-- select DB output type (default=GUESS)
   -guess                  ##-- guess DB type (default)
   -cache SIZE             ##-- set DB cache size (with suffixes K,M,G)
   -bval BVAL              ##-- separator string for variable-length -recno arrays
