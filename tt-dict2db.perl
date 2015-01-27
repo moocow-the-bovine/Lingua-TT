@@ -38,11 +38,14 @@ GetOptions(##-- general
 	   ##-- db options
 	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
 	   'db-btree|btree|bt|b' => sub { $dbf{type}='BTREE'; },
+	   'db-recno|recno|dbr' => sub { $dbf{type}='RECNO'; },
 	   'append|add|a!' => \$append,
 	   'truncate|trunc|clobber|t!' => sub { $append=!$_[1]; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-pagesize|db-page|db-psize|page|psize|p=s' => \$dbf{dbopts}{psize},
-	   'db-option|O=s' => $dbf{dbopts},
+	   'db-reclen|reclen|rl=i' => \$dbf{dbopts}{reclen},
+	   'db-bval|bval|bv=s'     => \$dbf{dbopts}{bval},
+	   'db-option|dbo|O=s' => $dbf{dbopts},
 	   'include-empty-analyses|include-empty|empty!' => \$include_empty,
 
 	   ##-- I/O
@@ -103,10 +106,6 @@ foreach $infile (@ARGV) {
     chomp;
     ($text,$a_in) = split(/\t/,$_,2);
     next if (!defined($a_in) && !$include_empty); ##-- no entry for unanalyzed input
-#    if (defined($dbencoding)) {
-#      $text = encode($dbencoding,$text);
-#      $a_in = encode($dbencoding,$a_in);
-#    }
     $tied->put($text,$a_in)==0
       or die("$prog: DB_File::put() failed: $!");
   }
@@ -147,21 +146,23 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
    -help
 
  DB Options:
-  -hash   , -btree      ##-- select DB output type (default='BTREE')
-  -append , -truncate   ##-- do/don't append to existing db (default=-append)
-  -empty  , -noempty    ##-- do/don't create records for empty analyses
-  -cache SIZE           ##-- set DB cache size (with suffixes K,M,G)
-  -page SIZE            ##-- set DB page size (with suffixes K,M,G)
-  -db-option OPT=VAL    ##-- set DB_File option
-  -db-encoding ENC      ##-- set DB internal encoding (default: null)
+  -hash , -btree , -recno ##-- select DB output type (default='BTREE')
+  -append , -truncate     ##-- do/don't append to existing db (default=-append)
+  -empty  , -noempty      ##-- do/don't create records for empty analyses
+  -cache SIZE             ##-- set DB cache size (with suffixes K,M,G)
+  -page SIZE              ##-- set DB page size (with suffixes K,M,G)
+  -bval BVAL              ##-- separator string for variable-length -recno arrays
+  -reclen RECLEN          ##-- record size in bytes for fixed-length -recno arrays
+  -db-option OPT=VAL      ##-- set DB_File option
+  -db-encoding ENC        ##-- set DB internal encoding (default: null)
 
  I/O Options:
-   -input-encoding ENC  ##-- set input encoding (default: null)
-   -encoding ENC        ##-- alias for -input-encoding=ENC -db-encoding=ENC
-   -pack-key PACKAS     ##-- set pack/unpack template for DB keys
-   -pack-val PACKAS     ##-- set pack/unpack template for DB values
-   -output FILE         ##-- default: STDOUT
-   -tmpdir DIR          ##-- build temporary DB in DIR then copy (e.g. tmpfs)
+   -input-encoding ENC    ##-- set input encoding (default: null)
+   -encoding ENC          ##-- alias for -input-encoding=ENC -db-encoding=ENC
+   -pack-key PACKAS       ##-- set pack/unpack template for DB keys
+   -pack-val PACKAS       ##-- set pack/unpack template for DB values
+   -output FILE           ##-- default: STDOUT
+   -tmpdir DIR            ##-- build temporary DB in DIR then copy (e.g. tmpfs)
 
 =cut
 

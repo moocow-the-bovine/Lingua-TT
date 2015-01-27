@@ -19,11 +19,10 @@ our $prog = basename($0);
 our $VERSION  = "0.01";
 
 our $include_empty = 0;
-our %dbf           = (type=>'GUESS', flags=>O_RDONLY, encoding=>undef, dbopts=>{cachesize=>'128M'});
-#our $dbencoding    = undef;
+our %dbf           = (type=>'RECNO', flags=>O_RDWR, encoding=>undef, dbopts=>{cachesize=>'128M'});
 
-our $oencoding = undef;
-our $outfile  = '-';
+our $cmpstr = 'string'; ##-- comparison code string
+our $external = 0;      ##-- use external sort?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -35,22 +34,18 @@ GetOptions(##-- general
 	   #'verbose|v=i' => \$verbose,
 
 	   ##-- db options
-	   'db-hash|hash|dbh' => sub { $dbf{type}='HASH'; },
-	   'db-btree|btree|dbb' => sub { $dbf{type}='BTREE'; },
-	   'db-recno|recno|dbr' => sub { $dbf{type}='RECNO'; },
-	   'db-guess|guess|dbg' => sub { $dbf{type}='GUESS'; },
 	   'db-cachesize|db-cache|cache|c=s' => \$dbf{dbopts}{cachesize},
 	   'db-reclen|reclen|rl=i' => \$dbf{dbopts}{reclen},
 	   'db-bval|bval|bv=s'     => \$dbf{dbopts}{bval},
-	   'db-option|dbo|O=s' => $dbf{dbopts},
+	   'db-option|dbo|O=s'    => $dbf{dbopts},
 	   'db-encoding|dbe|de=s' => \$dbf{encoding},
-
-	   ##-- I/O
-	   'output|o=s' => \$outfile,
-	   'output-encoding|oencoding|oe=s' => \$oencoding,
-	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
-	   'pack-key|pk=s' => \$dbf{pack_key},
 	   'pack-value|pv=s' => \$dbf{pack_val},
+
+	   ##-- sort options
+	   'compare|comp|cmp|C=s' => \$cmpstr,
+	   'compare-by-string|by-string|string|s' => sub { $cmpstr='string'; },
+	   'compare-by-number|by-number|numeric|num|n' => sub { $cmpstr='numeric'; },
+	   'external|ext|x!' => \$external,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -59,42 +54,74 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No DB file specified!'}) if (!@ARGV);
 ##----------------------------------------------------------------------
 ## Subs
 
+## $cmp = cmp_numeric()
+sub cmp_numeric { return $a <=> $b; }
+
+## $cmp = $cmp_string()
+sub cmp_string { return $a cmp $b; }
+
+## $cmp = cmp_numeric_ext()
+sub cmp_numeric_ext { return $Sort::External::a <=> $Sort::External::b; }
+
+## $cmp = $cmp_string_ext()
+sub cmp_string_ext { return $Sort::External::a cmp $Sort::External::b; }
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
+##-- compile sort sub
+our ($cmpsub);
+if (!defined($cmpsub = UNIVERSAL::can('main',"cmp_${cmpstr}".($external ? '_ext' : '')))) {
+  $cmpsub = eval qq{sub {$cmpstr}};
+  die("$prog: failed to compile comparison subroutine {$cmpstr}: $@")
+    if (!defined($cmpsub) || $@);
+}
 
 ##-- open db
 my $dbfile = shift(@ARGV);
 our $dbf = Lingua::TT::DBFile->new(%dbf,file=>$dbfile)
   or die("$prog: could not open DB file '$dbfile': $!");
 our $data = $dbf->{data};
-our $tied = $dbf->{tied};
 
-##-- open output handle
-our $ttout = Lingua::TT::IO->toFile($outfile,encoding=>$oencoding)
-  or die("$0: open failed for '$outfile': $!");
-our $outfh = $ttout->{fh};
+##-- sort
+if (!$external) {
+  ##-- sort in-memory
+  @$data = sort $cmpsub @$data;
+} else {
+  require Sort::External
+    or die("$prog: failed to load Sort::External module: $@");
+  my $sortex = Sort::External->new(
+				   #mem_threshold  => $dbf->{dbinfo}{cachesize},
+				   #cache_size     => $dbf->{dbinfo}{cachesize},
+				   sortsub        => $cmpsub,
+				   #working_dir    => undef,
+				  )
+    or die("$prog: failed to create Sort::External object: $!");
 
-##-- dump DB
-my ($key,$val,$status,$line);
-$key=$val=0;
-for ($status = $tied->seq($key,$val,R_FIRST);
-     $status == 0;
-     $status = $tied->seq($key,$val,R_NEXT))
-  {
-    #$line = $key."\t".$val."\n";
-    #$line = decode($dbencoding,$line) if (defined($dbencoding));
-    #$outfh->print($line);
-    ##--
-    $outfh->print($key, "\t", $val, "\n");
+  ##-- feed items
+  my $tied = $dbf->{tied};
+  my ($key,$val,$status);
+  for ($status=$tied->seq($key,$val,R_FIRST); $status==0; $status=$tied->seq($key,$val,R_NEXT)) {
+    $sortex->feed($val);
   }
+  $sortex->finish();
 
+  ##-- re-open db and insert
+  undef $data;
+  undef $tied;
+  $dbf->close();
+  $dbf->open($dbfile, flags=>($dbf->{flags}|O_TRUNC))
+    or die("$prog: failed to truncate DB-file $dbfile: $!");
+  $tied = $dbf->{tied};
+  while (defined($val=$sortex->fetch)) {
+    $tied->push($val);
+  }
+}
+
+##-- close safely
 undef($data);
-undef($tied);
 $dbf->close;
-$ttout->close;
 
 
 __END__
@@ -107,30 +134,27 @@ __END__
 
 =head1 NAME
 
-tt-db2dict.perl - convert DB dictionary to text
+tt-dbsort.perl - sort a DB recno array
 
 =head1 SYNOPSIS
 
- tt-db2dict.perl [OPTIONS] DB_FILE
+ tt-dbsort.perl [OPTIONS] DB_RECNO_FILE
 
  General Options:
    -help
 
  DB Options:
-  -hash , -btree , -recno ##-- select DB output type
-  -guess                  ##-- guess DB type (default)
   -cache SIZE             ##-- set DB cache size (with suffixes K,M,G)
   -bval BVAL              ##-- separator string for variable-length -recno arrays
   -reclen RECLEN          ##-- record size in bytes for fixed-length -recno arrays
   -db-option OPT=VAL      ##-- set DB_File option
-  -db-encoding ENC        ##-- set DB internal encoding (default: null)
 
- I/O Options:
-  -output FILE            ##-- default: STDOUT
-  -output-encoding ENC    ##-- output encoding (default: null)
-  -encoding ENC           ##-- alias for -db-encoding=ENC -output-encoding=ENC
-  -pack-key PACKAS        ##-- set pack/unpack template for DB keys
+ Sort Options:
+  -compare CODE           ##-- set comparison subroutine CODE
+  -by-string              ##-- sort by string value (default; like -compare='$a cmp $b')
+  -by-number              ##-- sort by numeric value (like -compare='$a <=> $b')
   -pack-val PACKAS        ##-- set pack/unpack template for DB values
+  -[no]external           ##-- do/don't use Sort::External to sort on disk
 
 =cut
 

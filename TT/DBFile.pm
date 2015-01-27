@@ -197,6 +197,7 @@ sub open {
 
   if (uc($dbf->{type}) eq 'RECNO') {
     ##-- tie: recno (array)
+    $dbf->{dbinfo}{flags} |= R_FIXEDLEN if (defined($dbf->{dbinfo}{reclen}));
     $dbf->{data} = [];
     $dbf->{tied} = tie(@{$dbf->{data}}, 'DB_File', $dbf->{file}, $dbf->{flags}, $dbf->{mode}, $dbf->{dbinfo})
       or confess(ref($dbf).":open(): tie() failed for ARRAY file '$dbf->{file}': $!");
