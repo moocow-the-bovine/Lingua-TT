@@ -26,8 +26,8 @@ our $verbose      = 0;
 
 our $globargs = 1; ##-- glob @ARGV?
 our $listargs = 0; ##-- args are file-lists?
-our $bos      = '<s>';
-our $eos      = '</s>';
+our $bos      = '$__';
+our $eos      = '__$';
 our $n        = 2;	  ##-- co-occurrence window size
 
 our $fieldsep = "\x{0b}"; ##-- field separator (internal); 0x0b=VT (vertical tab)
