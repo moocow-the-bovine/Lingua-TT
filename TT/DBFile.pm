@@ -192,10 +192,10 @@ sub open {
   }
 
   ##-- parse bval (octal, hex, and unicode escapes)
-  if ($dbf->{dbopts}{bval} && length($dbf->{dbopts}{bval}) > 1) {
-    $dbf->{dbopts}{bval} =~ s{\\([0-7]{1,3})}{chr(oct($1))}gx;
-    $dbf->{dbopts}{bval} =~ s{\\x([0-9a-f]{1,2})}{chr(hex($1))}gix;
-    $dbf->{dbopts}{bval} =~ s{\\u([0-9a-f]{1,4})}{chr(hex($1))}gix;
+  if ($dbf->{dbopts}{bval} && length($dbf->{dbopts}{bval}) != 1) {
+    $dbf->{dbopts}{bval} =~ s{\\([0-7]{1,3})}{chr(oct($1))}ge;
+    $dbf->{dbopts}{bval} =~ s{\\x([0-9a-f]{1,2})}{chr(hex($1))}gie;
+    $dbf->{dbopts}{bval} =~ s{\\u([0-9a-f]{1,4})}{chr(hex($1))}gie;
     $dbf->{dbopts}{bval} =~ s{\\n}{\n}g;
     $dbf->{dbopts}{bval} =~ s{\\r}{\r}g;
     $dbf->{dbopts}{bval} =~ s{\\t}{\t}g;
