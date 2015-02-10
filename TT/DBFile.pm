@@ -199,7 +199,7 @@ sub open {
     $dbf->{dbopts}{bval} =~ s{\\n}{\n}g;
     $dbf->{dbopts}{bval} =~ s{\\r}{\r}g;
     $dbf->{dbopts}{bval} =~ s{\\t}{\t}g;
-    $dbf->{dbopts}{bval} =~ s{\\v}{\v}g;
+    $dbf->{dbopts}{bval} =~ s{\\v}{\x0b}g;
   }
 
   ##-- setup info
