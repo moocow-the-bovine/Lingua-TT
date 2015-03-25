@@ -126,7 +126,7 @@ foreach $infile (@ARGV) {
   while (defined($line=<$infh>)) {
     $buf .= $line;
     ++$ntoks;
-    dumpSentence($line =~ /^$/ || ($bytoken && $line !~ /^(?:%%.*)$/));
+    dumpSentence if ($line =~ /^$/ || ($bytoken && $line !~ /^(?:%%.*)$/));
   }
   dumpSentence if ($buf);
 }

@@ -95,7 +95,7 @@ $doc->shuffle(seed=>$seed) if ($shuffle);
 our @odocs = $doc->splitN($nsplits,contiguous=>!$shuffle);
 
 ##-- output
-$outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.\d*)?d/);
+$outfmt .= ".%d" if ($outfmt !~ /\%(?:\d*\.?\d*)?d/);
 our @ofiles = map {sprintf($outfmt,$_)} (0..$#odocs);
 #print STDERR "$0: outfmt='$outfmt', ofiles=(", join(' ', map {"'$_'"} @ofiles), ")\n"; ##-- DEBUG
 foreach $oi (0..$#odocs) {
