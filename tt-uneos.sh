@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if test -z "$*" -o "$1" = '-h' -o "$1" = "--help" ; then
   echo "Usage: $0 TTFILE(s)"

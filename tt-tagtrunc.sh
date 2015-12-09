@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 #. `dirname $0`/cmdutils.sh#
 if test $# -lt 1 -o "$1" = "-h" -o "$1" = "--help" ; then

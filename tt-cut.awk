@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if test $# -lt 1 ; then
   echo "Usage: $0 AWK_EXPR [AWK_ARGS_AND_TT_FILE(s)]" 1>&2

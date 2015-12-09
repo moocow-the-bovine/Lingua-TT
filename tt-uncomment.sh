@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 if test -z "$*"; then
  echo "Usage: $0 TTFILE(s)"
