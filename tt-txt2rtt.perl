@@ -94,7 +94,7 @@ tt-txt2rtt.perl - convert raw text to rtt(z) format
 
 =head1 SYNOPSIS
 
- waste-txt2rtt.perl [LOCAL_OPTIONS] [TEXT_FILE=-] [-- TOKENIZER_OPTIONS...]
+ tt-txt2rtt.perl [LOCAL_OPTIONS] [TEXT_FILE=-] [-- TOKENIZER_OPTIONS...]
 
  Options:
   -help                  # this help message
