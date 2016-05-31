@@ -23,6 +23,7 @@ our %ioargs       = (encoding=>'UTF-8');
 our $from_field   = 1;
 our $tags_only	  = 0;
 our $strict       = 0;
+our $hfst_tags    = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -37,8 +38,9 @@ GetOptions(##-- general
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'from-field|ff|from|f=i' => \$from_field,
-	   'trim|tags-only|t' => \$tags_only,
-	   'strict|s' => \$strict,
+	   'trim|tags-only|t!' => \$tags_only,
+	   'strict|s!' => \$strict,
+	   'hfst-tags|hfst|ht!' => \$hfst_tags,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -78,7 +80,15 @@ foreach my $infile (@ARGV) {
 			 @f[0..($from_field-1)],
 			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
 			grep {!$strict || $_->[0] =~ /^[A-Z\$\.\,\(]+$/}
-			map {$tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_; [$tag, $tags_only ? "[$tag]" : $_]}
+			map {
+			  if ($hfst_tags) {
+			    $tag = /(\[\+[^\]]+\])+$/ ? $1 : $_;
+			    $tag = join('.', ($tag =~ /\[\+([^\]]+)\]/g));
+			  } else {
+			    $tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_;
+			  }
+			  [$tag, $tags_only ? "[$tag]" : $_]
+			}
 			@f[$from_field..$#f]
 		       ), "\n";
     } else {
@@ -115,8 +125,9 @@ tt-tag-uniq.perl - reduce TT analyses to unique tags
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for reducible fields (default=1)
-   -trim , -notrim	##-- do/don't dump only tags as "[TAG]" (default: -notrim)
-   -strict , -nostrict  ##-- do/don't apply tag heuristics (default=don't)
+   -[no]trim            ##-- do/don't dump only tags as "[TAG]" (default: -notrim)
+   -[no]strict          ##-- do/don't apply strict tag heuristics (default=don't)
+   -[no]hfst-tags       ##-- do/don't use HFST-style tag extraction (default=don't)
 
 =cut
 
