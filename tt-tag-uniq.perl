@@ -77,7 +77,7 @@ foreach my $infile (@ARGV) {
       print $outfh join("\t",
 			 @f[0..($from_field-1)],
 			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
-			grep {!$strict || /^[A-Z\$\.\,\(]+$/}
+			grep {!$strict || $_->[0] =~ /^[A-Z\$\.\,\(]+$/}
 			map {$tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_; [$tag, $tags_only ? "[$tag]" : $_]}
 			@f[$from_field..$#f]
 		       ), "\n";
