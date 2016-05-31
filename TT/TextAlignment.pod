@@ -66,7 +66,7 @@ boundaries together with raw original (untokenized) text.  It is a line-based fo
 =item "%%$RTT:COMPACT=" I<BOOL>
 
 RTT processing instruction declaring that this file is (or is not) in "compact" RTT format.
-I<BOOL> is either 0 (zero) or 1 (one).  If unspecified, file is assumed to be in "prolix" (non-compact) format.
+I<BOOL> is either 0 (zero) or 1 (one).  If unspecified or false, file is assumed to be in "prolix" (non-compact) format.
 
 =item "%%" I<COMMENT>
 
@@ -84,7 +84,7 @@ In "prolix" format, TAB-separated lines indicate aligned raw text and tokenized 
 The first field is the raw text the token covers, and subsequent fields are the associated
 token attributes.
 
-=item I<WHITESPACE> I<TOKTEXT...>
+=item I<WHITESPACE>? I<TOKTEXT...>
 
 In "compact" mode, token lines may be prefixed by optional whitespace,
 which is assumed to be present only in the raw text representation, and
@@ -94,7 +94,7 @@ Equivalent to the "prolix" lines:
  %%$c=WHITESPACE
  TOKTEXT	TOKTEXT...
 
-=item I<WHITESPACE> I<RAWTEXT> " $= " I<TOKTEXT...>
+=item I<WHITESPACE>? I<RAWTEXT> " $= " I<TOKTEXT...>
 
 "Compact" format for non-identity tokenizations, equivalent to the "prolix" lines:
 

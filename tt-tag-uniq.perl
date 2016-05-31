@@ -22,6 +22,7 @@ our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our $from_field   = 1;
 our $tags_only	  = 0;
+our $strict       = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -37,6 +38,7 @@ GetOptions(##-- general
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'from-field|ff|from|f=i' => \$from_field,
 	   'trim|tags-only|t' => \$tags_only,
+	   'strict|s' => \$strict,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
@@ -75,6 +77,7 @@ foreach my $infile (@ARGV) {
       print $outfh join("\t",
 			 @f[0..($from_field-1)],
 			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
+			grep {!$strict || /^[A-Z\$\.\,\(]+$/}
 			map {$tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_; [$tag, $tags_only ? "[$tag]" : $_]}
 			@f[$from_field..$#f]
 		       ), "\n";
@@ -113,6 +116,7 @@ tt-tag-uniq.perl - reduce TT analyses to unique tags
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for reducible fields (default=1)
    -trim , -notrim	##-- do/don't dump only tags as "[TAG]" (default: -notrim)
+   -strict , -nostrict  ##-- do/don't apply tag heuristics (default=don't)
 
 =cut
 
