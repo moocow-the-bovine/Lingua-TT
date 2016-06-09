@@ -20,10 +20,6 @@ our $verbose      = 1;
 
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
-our $from_field   = 1;
-our $tags_only	  = 0;
-our $strict       = 0;
-our $hfst_tags    = 0;
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -37,15 +33,10 @@ GetOptions(##-- general
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$ioargs{encoding},
-	   'from-field|ff|from|f=i' => \$from_field,
-	   'trim|tags-only|t!' => \$tags_only,
-	   'strict|s!' => \$strict,
-	   'hfst-tags|hfst|ht!' => \$hfst_tags,
 	  );
 
 pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 pod2usage({-exitval=>0,-verbose=>1}) if ($man);
-#pod2usage({-exitval=>0,-verbose=>0,-msg=>'Not enough arguments!'}) if (!@ARGV);
 
 if ($version || $verbose >= 2) {
   print STDERR "$progname version $VERSION by Bryan Jurish\n";
@@ -55,57 +46,67 @@ if ($version || $verbose >= 2) {
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
-push(@ARGV,'-') if (!@ARGV);
-our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
-    or die("$0: open failed for '$outfile': $!");
-my $outfh = $ttout->{fh};
+push(@ARGV,'-') if (@ARGV < 2);
 
-##-- ye olde loope
+##-- process input file(s)
+my %atf = qw();  # $analysis_tag => { $tagger_tag => $count, ... }
 foreach my $infile (@ARGV) {
   my $ttin = Lingua::TT::IO->fromFile($infile,%ioargs)
     or die("$0: open failed for '$infile': $!");
   my $infh = $ttin->{fh};
-  my ($prefix,$analyses,%seen,$tag);
+  my (@f,$tag,$a,$atag);
 
   while (defined($_=<$infh>)) {
-    if (/^%%/ || /^\s*$/) {
-      print $outfh $_;
-      next;
-    }
+    next if (/^%%/ || /^\s*$/);
     chomp;
-    @f = split(/\t/,$_);
-    if ($#f >= $from_field) {
-      %seen  = qw();
-      print $outfh join("\t",
-			 @f[0..($from_field-1)],
-			map {$seen{$_->[0]} ? qw() : ($seen{$_->[0]}=$_->[1])}
-			grep {!$strict || $_->[0] =~ /^[A-Z\$\.\,\(]+$/}
-			map {
-			  if ($hfst_tags) {
-			    ##-- hfst-style tags
-			    $tag = /((?:\[\+[^\]]+\])+)(?:\s+\<[0-9\.eE\+\-]+\>)?$/ ? $1 : undef;
-			    if (/((?:\\?\[[^\<\>\[\]\/\\]+\\?\])+)$/) {
-			      $tag = join('.', (($tag=$1) =~ /\[\+?([^\<\>\[\]\/\\]+)\\?\]/g));
-			    } elsif (/((?:\\?\[\<?[^\<\>\[\]\/\\]+\>?\\?\]))$/) {
-			      ($tag = $1) =~ s/[\\\<\>\[\]\+]//g;
-			    } else {
-			      $tag = $_;
-			    }
-			  } else {
-			    ##-- tagh-style tags
-			    $tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_;
-			  }
-			  [$tag, $tags_only ? "[$tag]" : $_]
-			}
-			@f[$from_field..$#f]
-		       ), "\n";
-    } else {
-      print $outfh $_, "\n";
+    @f   = split(/\t/,$_);
+    $tag = $f[1];
+    foreach $a (@f[2..$#f]) {
+      $atag = ($a =~ /\[_?([^\s\]]+)[\s\]]/ ? $1 : $a);
+      ++$atf{$a}{$tag};
     }
   }
   undef $infh;
   $ttin->close;
 }
+
+##-- compute analysis-wise tag-probabilities, entropies
+my %ax  = qw(); ##-- $a => "$best_tag_for_a".($verbose ? "\tf=f(t,a)\tN=f(a)\tH=$H_2(T|A=a)")
+my ($a,$t2f,$n, %t2p,$tp,$H, $fbest,$tbest);
+my $log2 = log(2.0);
+sub log2 { return $_[0]==0 ? 'NaN' : log($_[0])/$log2; }
+foreach my $a (sort keys %atf) {
+  $t2f = $atf{$a};
+  $n = 0;
+  $n += $_ foreach values (%$t2f);
+
+  ##-- normalize
+  $H = 0;
+  $fbest = -1;
+  $tbest = undef;
+  foreach $t (keys %$t2f) {
+    $tp = $t2f->{$t} / $n;
+    $H -= $tp * log2($tp);
+
+    if ($fbest < $t2f->{$t}) {
+      $fbest = $t2f->{$t};
+      $tbest = $t;
+    }
+  }
+
+  ##-- record best translation
+  $ax{$a} = $tbest.($verbose ? sprintf("\tf=%d\tN=%d\tH=%.4g",$fbest,$n,$H) : '');
+}
+
+##-- dump output
+our $ttout = Lingua::TT::IO->toFile($outfile,%ioargs)
+  or die("$0: open failed for '$outfile': $!");
+my $outfh = $ttout->{fh};
+
+foreach $a (sort keys %ax) {
+  print $outfh "$a\t$ax{$a}\n";
+}
+
 $ttout->close();
 
 __END__
@@ -118,24 +119,20 @@ __END__
 
 =head1 NAME
 
-tt-tag-uniq.perl - reduce TT analyses to unique tags
+tt-tagx-guess.perl - guess tag-translation dictionary from a "well-done" file
 
 =head1 SYNOPSIS
 
- tt-tag-uniq.perl [OPTIONS] [TT_FILE(s)]
+ tt-tag-guess.perl OPTIONS [WD_FILE(s)]
 
  General Options:
    -help
    -version
-   -verbose LEVEL
+   -verbose LEVEL	##-- print verbose comments if >1 (default=1)
 
  Other Options:
    -output FILE         ##-- output file (default: STDOUT)
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
-   -from=INDEX		##-- minimum index for reducible fields (default=1)
-   -[no]trim            ##-- do/don't dump only tags as "[TAG]" (default: -notrim)
-   -[no]strict          ##-- do/don't apply strict tag heuristics (default=don't)
-   -[no]hfst-tags       ##-- do/don't use HFST-style tag extraction (default=don't)
 
 =cut
 
