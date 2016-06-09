@@ -60,10 +60,10 @@ foreach my $infile (@ARGV) {
     next if (/^%%/ || /^\s*$/);
     chomp;
     @f   = split(/\t/,$_);
-    $tag = $f[1];
+    $tag = ($f[1] =~ /\[_?([^\s\]]+)[\s\]]/ ? $1 : $f[1]);
     foreach $a (@f[2..$#f]) {
       $atag = ($a =~ /\[_?([^\s\]]+)[\s\]]/ ? $1 : $a);
-      ++$atf{$a}{$tag};
+      ++$atf{$atag}{$tag};
     }
   }
   undef $infh;
