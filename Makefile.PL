@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile
   (
    NAME		=> 'Lingua::TT',
-   AUTHOR       => 'Bryan Jurish <jurish@uni-potsdam.de>',
+   AUTHOR       => 'Bryan Jurish <moocow@cpan.org>',
    ABSTRACT	=> 'TnT-style I/O utilities',
    VERSION_FROM	=> 'TT.pm',
 

@@ -1,6 +1,6 @@
 ## -*- Mode: CPerl -*-
 ## File: Lingua::TT.pm
-## Author: Bryan Jurish <moocow@ling.uni-potsdam.de>
+## Author: Bryan Jurish <moocow@cpan.org>
 ## Descript: TT I/O: top-level
 
 
