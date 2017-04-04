@@ -12,7 +12,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 ##-- program vars
 our $progname     = basename($0);
@@ -93,7 +93,7 @@ foreach my $infile (@ARGV) {
 			    }
 			  } else {
 			    ##-- tagh-style tags
-			    $tag = /\[_?([^\]\s]+)[\]\s]/ ? $1 : $_;
+			    $tag = /\[_?([^<>\]\s]+)[\]\s]/ ? $1 : $_;
 			  }
 			  [$tag, $tags_only ? "[$tag]" : $_]
 			}
