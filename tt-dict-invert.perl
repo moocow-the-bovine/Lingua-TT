@@ -12,11 +12,12 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION  = "0.01";
+our $VERSION  = "0.02";
 our $encoding = undef;
 our $outfile  = '-';
 
 our $weights = 0; ##-- keep weights in value part of dict?
+our $nmax    = -1; ##-- maximum number of target values (-1:no max)?
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -29,6 +30,7 @@ GetOptions(##-- general
 
 	   ##-- misc
 	   'weights|weight|w!' => \$weights, ##-- if true, weights will be parsed and appended to dict values
+	   'max-values|nmax|n=i' => \$nmax,
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
@@ -74,6 +76,19 @@ foreach $infile (@ARGV ? @ARGV : '-') {
 ##-- trim leading TABs
 $_=~s/^\t// foreach (values %$dh);
 
+##-- trim to $nmax values
+if ($nmax > 0) {
+  my (@vals);
+  foreach (values %$dh) {
+    @vals = split(/\t/,$_);
+    if (@vals > $nmax) {
+      splice(@vals, $nmax, @vals-$nmax);
+      $_ = join("\t",@vals);
+    }
+  }
+}
+
+
 ##-- dump
 $dict->saveFile($outfile,encoding=>$encoding);
 
@@ -100,7 +115,8 @@ tt-dict-invert.perl - invert TT dict files
    #-verbose LEVEL
 
  I/O Options:
-   -weight , -noweight  ##-- do/don't keep FST-style weight suffixes in value part (default=don't)
+   -[no]weight          ##-- do/don't keep FST-style weight suffixes in value part (default=don't)
+   -nmax NMAX           ##-- maximum number of target values per key (default=-1: no max)
    -output FILE         ##-- default: STDOUT
    -encoding ENCODING   ##-- default: UTF-8
 
