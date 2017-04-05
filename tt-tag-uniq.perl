@@ -12,7 +12,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.02";
+our $VERSION = "0.03";
 
 ##-- program vars
 our $progname     = basename($0);
@@ -22,6 +22,7 @@ our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');
 our $from_field   = 1;
 our $tags_only	  = 0;
+our $tags_prepend = 0;
 our $strict       = 0;
 our $hfst_tags    = 0;
 
@@ -39,6 +40,7 @@ GetOptions(##-- general
 	   'encoding|e=s' => \$ioargs{encoding},
 	   'from-field|ff|from|f=i' => \$from_field,
 	   'trim|tags-only|t!' => \$tags_only,
+	   'prepend|tags-prepend|p!' => \$tags_prepend,
 	   'strict|s!' => \$strict,
 	   'hfst-tags|hfst|ht!' => \$hfst_tags,
 	  );
@@ -95,7 +97,7 @@ foreach my $infile (@ARGV) {
 			    ##-- tagh-style tags
 			    $tag = /\[_?([^<>\]\s]+)[\]\s]/ ? $1 : $_;
 			  }
-			  [$tag, $tags_only ? "[$tag]" : $_]
+			  [$tag, ($tags_only ? "[$tag]" : ($tags_prepend ? "[$tag] $_" : $_))]
 			}
 			@f[$from_field..$#f]
 		       ), "\n";
@@ -134,6 +136,7 @@ tt-tag-uniq.perl - reduce TT analyses to unique tags
    -encoding ENCODING   ##-- I/O encoding (default: UTF-8)
    -from=INDEX		##-- minimum index for reducible fields (default=1)
    -[no]trim            ##-- do/don't dump only tags as "[TAG]" (default: -notrim)
+   -[no]prepend         ##-- do/don't prepend tags as "[TAG] " (default: -noprepend; only if -notrim)
    -[no]strict          ##-- do/don't apply strict tag heuristics (default=don't)
    -[no]hfst-tags       ##-- do/don't use HFST-style tag extraction (default=don't)
 
