@@ -151,18 +151,35 @@ sub saveNativeFh {
 ## + loads from handle
 ## + %opts
 ##    encoding => $enc,  ##-- sets $fh :encoding flag if defined; default: none
+##    append   => $bool, ##-- if true, multiple entries for a single key will be appended (TAB-separated)
 sub loadNativeFh {
   my ($dict,$fh,%opts) = @_;
   $dict->setFhLayers($fh,%opts);
   $dict = $dict->new() if (!ref($dict));
   my $dh = $dict->{dict};
   my ($line,$key,$val);
-  while (defined($line=<$fh>)) {
-    chomp($line);
-    next if ($line =~ /^\s*$/ || $line =~ /^%%/);
-    ($key,$val) = split(/\t/,$line,2);
-    next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
-    $dh->{$key} = $val;
+  if ($opts{append}) {
+    ##-- append mode
+    while (defined($line=<$fh>)) {
+      chomp($line);
+      next if ($line =~ /^\s*$/ || $line =~ /^%%/);
+      ($key,$val) = split(/\t/,$line,2);
+      next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
+      if (exists($dh->{$key})) {
+	$dh->{$key} .= "\t$val";
+      } else {
+	$dh->{$key}  = $val;
+      }
+    }
+  } else {
+    ##-- clobber mode (default)
+    while (defined($line=<$fh>)) {
+      chomp($line);
+      next if ($line =~ /^\s*$/ || $line =~ /^%%/);
+      ($key,$val) = split(/\t/,$line,2);
+      next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
+      $dh->{$key} = $val;
+    }
   }
   return $dict;
 }

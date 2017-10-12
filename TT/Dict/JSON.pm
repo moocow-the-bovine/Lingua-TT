@@ -151,6 +151,7 @@ sub saveNativeFh {
 ## + loads from handle
 ## + %opts
 ##    encoding => $enc,  ##-- sets $fh :encoding flag if defined; default: none
+##    append   => $bool, ##-- if true, multiple entries for a single key will be appended (and maybe promoted to ARRAY)
 sub loadNativeFh {
   my ($dict,$fh,%opts) = @_;
   binmode($fh,":utf8");
@@ -158,12 +159,30 @@ sub loadNativeFh {
   my $dh  = $dict->{dict};
   my $jxs = $dict->jsonxs;
   my ($line,$key,$val);
-  while (defined($line=<$fh>)) {
-    chomp($line);
-    next if ($line =~ /^\s*$/ || $line =~ /^%%/);
-    ($key,$val) = split(/\t/,$line,2);
-    next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
-    $dh->{$key} = $jxs->decode($val);
+  if ($opts{append}) {
+    ##-- append mode
+    my ($oldval);
+    while (defined($line=<$fh>)) {
+      chomp($line);
+      next if ($line =~ /^\s*$/ || $line =~ /^%%/);
+      ($key,$val) = split(/\t/,$line,2);
+      next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
+      if (!defined($oldval=$dh->{$key})) {
+	$dh->{$key} = $jxs->decode($val);
+      } else {
+	$oldval = $dh->{$key} = [$oldval] if (!UNIVERSAL::isa($oldval,'ARRAY'));
+	push(@$oldval, $jxs->decode($val));
+      }
+    }
+  } else {
+    ##-- clobber mode (default)
+    while (defined($line=<$fh>)) {
+      chomp($line);
+      next if ($line =~ /^\s*$/ || $line =~ /^%%/);
+      ($key,$val) = split(/\t/,$line,2);
+      next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
+      $dh->{$key} = $jxs->decode($val);
+    }
   }
   return $dict;
 }

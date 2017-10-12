@@ -50,22 +50,14 @@ if ($use_json) {
 }
 
 ##-- create dict
-my ($dict);
+my $dict = $dclass->new();
 
 ##-- munge arguments
 push(@ARGV,'-') if (!@ARGV);
 foreach $dictfile (@ARGV) {
-  my $d2 = $dclass->loadFile($dictfile,encoding=>$encoding)
+  $dict->loadFile($dictfile,encoding=>$encoding,append=>$append)
     or die("$0: ${dclass}::loadFile() failed for file '$dictfile': $!");
-
-  if (!defined($dict)) {
-    $dict = $d2;
-  } else {
-    $dict->merge($d2, append=>$append);
-  }
 }
-
-$dict = $dclass->new if (!$dict);
 
 ##-- dump
 $dict->saveFile($outfile,encoding=>$encoding);
