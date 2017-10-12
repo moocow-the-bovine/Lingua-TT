@@ -171,7 +171,8 @@ sub loadNativeFh {
 	$dh->{$key} = $jxs->decode($val);
       } else {
 	$oldval = $dh->{$key} = [$oldval] if (!UNIVERSAL::isa($oldval,'ARRAY'));
-	push(@$oldval, $jxs->decode($val));
+	$val    = $jxs->decode($val);
+	push(@$oldval, UNIVERSAL::isa($val,'ARRAY') ? @$val : $val);
       }
     }
   } else {
