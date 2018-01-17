@@ -17,7 +17,7 @@ use File::Basename qw(basename);
 ##----------------------------------------------------------------------
 
 our $prog = basename($0);
-our $VERSION  = "0.01";
+our $VERSION  = "0.02";
 
 our $iencoding = undef;
 
@@ -25,6 +25,7 @@ our $include_empty = 0;
 our %dbf           = (type=>'BTREE', flags=>O_RDWR|O_CREAT, encoding=>undef, dbopts=>{cachesize=>'32M'});
 our $outfile  = undef; ##-- default: INFILE.db
 our $tmpdir   = undef; ##-- build in temp directory (e.g. tmpfs)?
+our $parse_str = undef; ##-- input-parsing code
 
 ##----------------------------------------------------------------------
 ## Command-line processing
@@ -49,6 +50,7 @@ GetOptions(##-- general
 	   'include-empty-analyses|include-empty|empty!' => \$include_empty,
 
 	   ##-- I/O
+	   'input-parse|parse|P=s' => \$parse_str,
 	   'input-encoding|iencoding|ie=s' => \$iencoding,
 	   'output-db|output|out|o|odb|db=s' => \$outfile,
 	   'output-db-encoding|db-encoding|dbe|oe=s' => \$dbf{encoding},
@@ -64,11 +66,21 @@ pod2usage({-exitval=>0,-verbose=>0}) if ($help);
 ##----------------------------------------------------------------------
 ## Subs
 
+sub parse_default { split(/\t/,$_,2); }
+my $parse_sub = \&parse_default;
+
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
 push(@ARGV,'-') if (!@ARGV);
+
+##-- parsing
+if ($parse_str) {
+  $parse_sub = eval qq{sub {$parse_str}};
+  die("$prog: ERROR: failed to compile user-supplied value-parser code {$parse_str}".($@ ? ": $@" : ''))
+    if ($@ || !$parse_sub);
+}
 
 ##-- defaults
 $outfile    = $ARGV[0].".db"  if (!defined($outfile));
@@ -96,6 +108,7 @@ our $data = $dbf->{data};
 our $tied = $dbf->{tied};
 
 ##-- process input files
+my ($key,$val);
 foreach $infile (@ARGV) {
   $ttin = Lingua::TT::IO->fromFile($infile,encoding=>$iencoding)
     or die("$0: open failed for '$infile': $!");
@@ -104,9 +117,9 @@ foreach $infile (@ARGV) {
   while (defined($_=<$infh>)) {
     next if (/^%%/ || /^$/);
     chomp;
-    ($text,$a_in) = split(/\t/,$_,2);
-    next if (!defined($a_in) && !$include_empty); ##-- no entry for unanalyzed input
-    $tied->put($text,$a_in)==0
+    ($key,$val) = $parse_sub->();
+    next if (!defined($key) || (!defined($val) && !$include_empty)); ##-- no entry for unanalyzed input
+    $tied->put($key,$val)==0
       or die("$prog: DB_File::put() failed: $!");
   }
   $ttin->close;
@@ -157,6 +170,7 @@ tt-dict2db.perl - convert a text dictionary to a DB_File
   -db-encoding ENC        ##-- set DB internal encoding (default: null)
 
  I/O Options:
+   -input-parse CODE      ##-- parse input using CODE (parse $_, returns ($key,$val))
    -input-encoding ENC    ##-- set input encoding (default: null)
    -encoding ENC          ##-- alias for -input-encoding=ENC -db-encoding=ENC
    -pack-key PACKAS       ##-- set pack/unpack template for DB keys
