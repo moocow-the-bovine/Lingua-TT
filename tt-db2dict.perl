@@ -16,13 +16,14 @@ use File::Basename qw(basename);
 ##----------------------------------------------------------------------
 
 our $prog = basename($0);
-our $VERSION  = "0.01";
+our $VERSION  = "0.02";
 
 our $include_empty = 0;
 our %dbf           = (type=>'GUESS', flags=>O_RDONLY, encoding=>undef, dbopts=>{cachesize=>'128M'});
 #our $dbencoding    = undef;
 
 our $oencoding = undef;
+our $oformat_str = undef;
 our $outfile  = '-';
 
 ##----------------------------------------------------------------------
@@ -47,6 +48,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
+	   'output-format|format|F=s' => \$oformat_str,
 	   'output-encoding|oencoding|oe=s' => \$oencoding,
 	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
 	   'pack-key|pk=s' => \$dbf{pack_key},
@@ -59,11 +61,19 @@ pod2usage({-exitval=>0,-verbose=>0,-msg=>'No DB file specified!'}) if (!@ARGV);
 ##----------------------------------------------------------------------
 ## Subs
 
+sub oformat_default { $_[0]."\t".$_[1]; }
+my $oformat_sub = \&oformat_default;
 
 ##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 
+##-- output formatting code
+if (defined($oformat_str)) {
+  $oformat_sub = eval qq{sub {$oformat_str}};
+  die("$prog: ERROR: failed to compile user-supplied formatting code {$oformat_str}".($@ ? ": $@" : ''))
+    if ($@ || !$oformat_sub);
+}
 
 ##-- open db
 my $dbfile = shift(@ARGV);
@@ -88,7 +98,7 @@ for ($status = $tied->seq($key,$val,R_FIRST);
     #$line = decode($dbencoding,$line) if (defined($dbencoding));
     #$outfh->print($line);
     ##--
-    $outfh->print($key, "\t", $val, "\n");
+    $outfh->print( $oformat_sub->($key,$val), "\n" );
   }
 
 undef($data);
@@ -127,6 +137,7 @@ tt-db2dict.perl - convert DB dictionary to text
 
  I/O Options:
   -output FILE            ##-- default: STDOUT
+  -output-format CODE     ##-- code to format output line (for args ($key,$val))
   -output-encoding ENC    ##-- output encoding (default: null)
   -encoding ENC           ##-- alias for -db-encoding=ENC -output-encoding=ENC
   -pack-key PACKAS        ##-- set pack/unpack template for DB keys
