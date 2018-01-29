@@ -16,6 +16,7 @@ our $VERSION  = "0.01";
 our $encoding = undef;
 our $outfile  = '-';
 our $append   = 0;
+our $merge    = 0;
 our $use_json = 0;
 
 ##----------------------------------------------------------------------
@@ -29,6 +30,7 @@ GetOptions(##-- general
 	   'output|o=s' => \$outfile,
 	   'encoding|e=s' => \$encoding,
 	   'append|a!' => \$append,
+	   'merge|m!' => \$merge,
 	   'clobber|c!' => sub { $append=!$_[1]; },
 	  );
 
@@ -55,7 +57,7 @@ my $dict = $dclass->new();
 ##-- munge arguments
 push(@ARGV,'-') if (!@ARGV);
 foreach $dictfile (@ARGV) {
-  $dict->loadFile($dictfile,encoding=>$encoding,append=>$append)
+  $dict->loadFile($dictfile,encoding=>$encoding,append=>($append||$merge),merge=>$merge)
     or die("$0: ${dclass}::loadFile() failed for file '$dictfile': $!");
 }
 
@@ -86,6 +88,11 @@ tt-dict-merge.perl - merge text-keyed TT dictionary files
   -encoding ENCODING   ##-- default: UTF-8
   -json    , -nojson   ##-- do/don't store values as JSON (default=don't)
   -append  , -clobber  ##-- append or clobber old analyses for multiple entries? (default=-clobber)
+  -merge   , -nomerge  ##-- attempt to merge JSON HASH values for multiple entries? (default=don't)
+
+ Notes:
+  In -json mode, -append promotes values to ARRAYs, and -merge attempts to merge
+  HASH-references if possible.
 
 =cut
 

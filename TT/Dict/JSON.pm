@@ -152,14 +152,16 @@ sub saveNativeFh {
 ## + %opts
 ##    encoding => $enc,  ##-- sets $fh :encoding flag if defined; default: none
 ##    append   => $bool, ##-- if true, multiple entries for a single key will be appended (and maybe promoted to ARRAY)
+##    merge    => $bool, ##-- if true, multiple HASH-entries for a single key will be merged
 sub loadNativeFh {
   my ($dict,$fh,%opts) = @_;
   binmode($fh,":utf8");
   $dict   = $dict->new() if (!ref($dict));
   my $dh  = $dict->{dict};
   my $jxs = $dict->jsonxs;
+  my $merge = $opts{merge};
   my ($line,$key,$val);
-  if ($opts{append}) {
+  if ($opts{append} || $opts{merge}) {
     ##-- append mode
     my ($oldval);
     while (defined($line=<$fh>)) {
@@ -167,11 +169,18 @@ sub loadNativeFh {
       next if ($line =~ /^\s*$/ || $line =~ /^%%/);
       ($key,$val) = split(/\t/,$line,2);
       next if (!defined($val)); ##-- don't store keys for undef values (but do for empty string)
+      $val = $jxs->decode($val);
       if (!defined($oldval=$dh->{$key})) {
-	$dh->{$key} = $jxs->decode($val);
-      } else {
+	##-- new key
+	$dh->{$key} = $val;
+      }
+      elsif ($merge && (ref($oldval)//'') eq 'HASH' && (ref($val)//'') eq 'HASH') {
+	##-- merge multiple HASH values
+	@$oldval{keys %$val} = values %$val;
+      }
+      else {
+	##-- append / promote to ARRAY values
 	$oldval = $dh->{$key} = [$oldval] if (!UNIVERSAL::isa($oldval,'ARRAY'));
-	$val    = $jxs->decode($val);
 	push(@$oldval, UNIVERSAL::isa($val,'ARRAY') ? @$val : $val);
       }
     }
