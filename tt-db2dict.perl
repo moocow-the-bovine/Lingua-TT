@@ -48,7 +48,7 @@ GetOptions(##-- general
 
 	   ##-- I/O
 	   'output|o=s' => \$outfile,
-	   'output-format|format|F=s' => \$oformat_str,
+	   'output-format|format|of|F=s' => \$oformat_str,
 	   'output-encoding|oencoding|oe=s' => \$oencoding,
 	   'encoding|e=s' => sub {$dbf{encoding}=$oencoding=$_[1]},
 	   'pack-key|pk=s' => \$dbf{pack_key},
