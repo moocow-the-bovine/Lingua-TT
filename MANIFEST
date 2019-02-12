@@ -1,6 +1,9 @@
 Makefile.PL
+MANIFEST
+MANIFEST.SKIP
 README.rpod
 README.txt
+
 TT.pm
 TT/CDBFile.pm
 TT/CDBFile/JSON.pm
@@ -30,12 +33,17 @@ TT/Persistent.pm
 TT/Sentence.pm
 TT/Sort.pm
 TT/TextAlignment.pm
+TT/TextAlignment.pod
 TT/Token.pm
 TT/Unify.pm
 TT/Unigrams.pm
+
 moopod.css
+
 t/00_basic.t
 t/common.plt
+
+tj-eval.perl
 tt-123-compact.perl
 tt-123-eos-compress.perl
 tt-123-eos-expand.awk
@@ -45,6 +53,7 @@ tt-123-sum.perl
 tt-123-tt2moot.perl
 tt-123-uncompact.perl
 tt-1grams.perl
+tt-1gsum.perl
 tt-2btt.perl
 tt-2xt.awk
 tt-addeos-regex.perl

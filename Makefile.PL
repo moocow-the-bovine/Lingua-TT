@@ -1,6 +1,12 @@
 use ExtUtils::MakeMaker;
 
 ##----------------------------------------------------------------------
+## Hacks
+
+##-- workaround for irritating symlink-related errors on kira (ubuntu 16.04 LTS / EUMM v7.0401)
+do "./find.hack" if (-e "./find.hack");
+
+##----------------------------------------------------------------------
 ## MAIN
 ##----------------------------------------------------------------------
 WriteMakefile
@@ -12,13 +18,13 @@ WriteMakefile
 
    PREREQ_PM    => {
 		    #'Gfsm'=>0.0207,
-		    'Encode'=>undef,
-		    'File::Basename'=>undef,
-		    'Getopt::Long'=>undef,
-		    'Pod::Usage'=>undef,
+		    'Encode'=>0,
+		    'File::Basename'=>0,
+		    'Getopt::Long'=>0,
+		    'Pod::Usage'=>0,
 		    ##--
-		    'DB_File' => undef,
-		    'CDB_File' => undef,
+		    'DB_File' => 0,
+		    'CDB_File' => 0,
 		    ##--
 		    #'Storable'=>undef,
 		    #'PDL' => '2.4.2',
@@ -42,6 +48,14 @@ WriteMakefile
 ##-----------------------------------------------------------------------
 ## Extensions
 ##-----------------------------------------------------------------------
+
+##---------------------------------------------------------------
+sub MY::dist_basics {
+  package MY;
+  my $inherited = shift->SUPER::dist_basics(@_);
+  $inherited =~ s{-e (\S+)}{-e 'do "./find.hack" if (-e "./find.hack"); $1'}g;
+  return $inherited;
+}
 
 ##---------------------------------------------------------------
 sub MY::constants {
