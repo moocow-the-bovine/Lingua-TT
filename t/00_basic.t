@@ -1,14 +1,20 @@
 ##-*- Mode: CPerl -*-
-my ($last_test,$loaded);
+use Test::More;
 
-######################### We start with some black magic to print on failure.
-use lib '../blib/lib','../blib/arch';
-
-BEGIN { $last_test = 1; $| = 1; print "1..$last_test\n"; }
-END   { print "not ok 1  Can't load module\n" unless $loaded; }
-
-use Lingua::TT;
-$loaded = 1;
-print "ok 1\n";
-
-######################### End of black magic.
+BEGIN {
+  my @modules = qw(
+		    Lingua::TT::CDBFile
+		    Lingua::TT::DBFile::PackedArray
+		    Lingua::TT::DBFile
+		    Lingua::TT::Dict
+		    Lingua::TT::Diff
+		    Lingua::TT::Enum
+		    Lingua::TT::Packed
+		    Lingua::TT::Sort
+		    Lingua::TT::TextAlignment
+		    Lingua::TT::Unigrams
+		    Lingua::TT
+		 );
+  use_ok($_) foreach (@modules);
+  done_testing();
+}
