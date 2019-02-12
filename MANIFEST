@@ -3,6 +3,7 @@ MANIFEST
 MANIFEST.SKIP
 README.rpod
 README.txt
+Changes
 
 TT.pm
 TT/CDBFile.pm
@@ -41,7 +42,6 @@ TT/Unigrams.pm
 moopod.css
 
 t/00_basic.t
-t/common.plt
 
 tj-eval.perl
 tt-123-compact.perl

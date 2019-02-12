@@ -1,0 +1,21 @@
+2015-01-27
+
+$ echo `du -b tok0.bin  | cut -f1`/4 | bc
+339001 : N
+
+##-- db sort
+$ cp tok0.bin tok1.bin ; time ./tt-dbsort.perl tok1.bin -n -pv=L -reclen=4
+real	0m5.051s : 67k rec/sec
+
+##-- Sort::External
+$ cp tok0.bin tok1.bin ; time ./tt-dbsort.perl -ext tok1.bin -n -pv=L -reclen=4
+real	0m4.289s : 79k rec/sec
+
+##-- bin->text
+$ time ./tt-db2dict.perl tok0.bin -reclen=4 -pv=L | tt-cut.awk '$2' >tok0.dat
+real	0m2.103s : 160k tok/sec
+
+$ time csort.sh -n tok0.dat >tok1.dat
+real	0m0.122s : 2.8M tok/sec (total: 152k rec/sec)
+
+$ time ./tt-db2dict.perl tok0.bin -reclen=4 -pv=L | tt-cut.awk '$2' | csort.sh -n >tok1.dat
