@@ -14,7 +14,7 @@ use File::Basename qw(basename);
 ##----------------------------------------------------------------------
 
 our $prog = basename($0);
-our $VERSION  = "0.01";
+our $VERSION  = "0.11";
 
 our %dbf           = (utf8=>0);
 our %apply_opts    = (allow_empty=>0);

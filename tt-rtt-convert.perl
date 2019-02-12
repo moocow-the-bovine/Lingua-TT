@@ -22,7 +22,7 @@ our $vl_trace = 4;
 
 our $prog         = basename($0);
 our $verbose      = $vl_info;
-our $VERSION	  = 0.01;
+our $VERSION	  = 0.11;
 
 our $outfile      = '-';
 our %ioargs       = (encoding=>'UTF-8');

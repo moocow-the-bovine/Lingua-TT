@@ -12,7 +12,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.03";
+our $VERSION = "0.11";
 
 ##-- program vars
 our $progname     = basename($0);

@@ -13,7 +13,7 @@ use Lingua::TT;
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.02";
+our $VERSION = "0.11";
 
 ##-- program vars
 our $progname     = basename($0);

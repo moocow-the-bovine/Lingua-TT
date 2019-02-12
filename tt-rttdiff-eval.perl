@@ -23,7 +23,7 @@ our $vl_trace = $Lingua::TT::Diff::vl_trace;
 
 our $prog         = basename($0);
 our $verbose      = $vl_info;
-our $VERSION	  = 0.01;
+our $VERSION	  = 0.11;
 
 our $outfile      = '-';
 our %diffargs     = qw();

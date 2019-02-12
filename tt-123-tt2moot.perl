@@ -14,7 +14,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION = "0.01";
+our $VERSION = "0.11";
 
 our $verbose = 0;
 our ($version);

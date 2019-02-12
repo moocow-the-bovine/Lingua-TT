@@ -12,7 +12,7 @@ use File::Basename qw(basename);
 ## Globals
 ##----------------------------------------------------------------------
 
-our $VERSION  = "0.01";
+our $VERSION  = "0.11";
 our $encoding = undef;
 our $outfile  = '-';
 our $append   = 0;
