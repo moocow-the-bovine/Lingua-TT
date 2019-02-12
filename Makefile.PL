@@ -25,6 +25,7 @@ WriteMakefile
 		    ##--
 		    'DB_File' => 0,
 		    'CDB_File' => 0,
+		    'JSON::XS' => 0,
 		    ##--
 		    #'Storable'=>undef,
 		    #'PDL' => '2.4.2',
