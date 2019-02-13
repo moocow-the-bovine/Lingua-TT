@@ -16,6 +16,7 @@ WriteMakefile
    ABSTRACT	=> 'TnT-style I/O utilities',
    VERSION_FROM	=> 'TT.pm',
 
+   MIN_PERL_VERSION => '5.010', ##-- for // operator
    PREREQ_PM    => {
 		    #'Gfsm'=>0.0207,
 		    'Encode'=>0,
